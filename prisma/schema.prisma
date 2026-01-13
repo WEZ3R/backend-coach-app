@@ -72,14 +72,15 @@ model CoachProfile {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  clients          ClientProfile[]
+  clients          ClientProfile[]     @relation("ClientCoach") // Ancien champ pour rétrocompatibilité
+  clientCoaches    ClientCoach[]       // Nouvelle relation many-to-many
   programs         Program[]
   programTemplates ProgramTemplate[]
-  sentMessages     Message[]       @relation("CoachMessages")
+  sentMessages     Message[]           @relation("CoachMessages")
   channels         Channel[]
   reviews          Review[]
-  posts            CoachPost[]     // Posts du mur du coach
-  coachRequests    CoachRequest[]  // Demandes reçues
+  posts            CoachPost[]         // Posts du mur du coach
+  coachRequests    CoachRequest[]      // Demandes reçues
 
   @@map("coach_profiles")
 }
@@ -89,8 +90,8 @@ model ClientProfile {
   id             String    @id @default(uuid())
   userId         String    @unique
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  coachId        String?
-  coach          CoachProfile? @relation(fields: [coachId], references: [id])
+  coachId        String?   // Coach principal (pour rétrocompatibilité)
+  coach          CoachProfile? @relation("ClientCoach", fields: [coachId], references: [id])
   weight         Float?    // Poids initial en kg
   height         Float?    // Taille en cm
   dateOfBirth    DateTime? // Date de naissance pour calculer l'âge
@@ -102,13 +103,32 @@ model ClientProfile {
   updatedAt      DateTime  @updatedAt
 
   // Relations
+  coaches          ClientCoach[]   // Nouvelle relation many-to-many
   stats            DailyStat[]
   meals            Meal[]
-  receivedMessages Message[]   @relation("ClientMessages")
+  receivedMessages Message[]       @relation("ClientMessages")
   reviews          Review[]
   coachRequests    CoachRequest[]  // Demandes envoyées
 
   @@map("client_profiles")
+}
+
+// Table de liaison Client-Coach (relation many-to-many)
+model ClientCoach {
+  id          String        @id @default(uuid())
+  clientId    String
+  client      ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  coachId     String
+  coach       CoachProfile  @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  isPrimary   Boolean       @default(false) // Indique si c'est le coach principal
+  startDate   DateTime      @default(now()) // Date de début de la relation
+  endDate     DateTime?     // Date de fin (si la relation se termine)
+  isActive    Boolean       @default(true)  // Relation active ou non
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([clientId, coachId])
+  @@map("client_coaches")
 }
 
 // Programme d'entraînement

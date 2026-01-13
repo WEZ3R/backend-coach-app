@@ -18,6 +18,7 @@ import postsRoutes from './routes/posts.js';
 import coachesRoutes from './routes/coaches.js';
 import requestRoutes from './routes/requests.js';
 import setCompletionRoutes from './routes/setCompletions.js';
+import clientCoachRoutes from './routes/clientCoach.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/posts', postsRoutes);
 app.use('/api/coaches', coachesRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/set-completions', setCompletionRoutes);
+app.use('/api/client-coaches', clientCoachRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {
