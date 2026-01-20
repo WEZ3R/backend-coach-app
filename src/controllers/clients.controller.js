@@ -20,18 +20,23 @@ export const getCoachClients = async (req, res) => {
       });
     }
 
-    // Récupérer tous les clients acceptés assignés à ce coach
-    const acceptedClients = await prisma.clientProfile.findMany({
+    // Récupérer tous les clients via la table ClientCoach (relation many-to-many)
+    const clientCoachRelations = await prisma.clientCoach.findMany({
       where: {
         coachId: coachProfile.id,
+        isActive: true,
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
+        client: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
       },
@@ -74,10 +79,12 @@ export const getCoachClients = async (req, res) => {
       requestDate: request.createdAt,
     }));
 
-    // Ajouter le status aux clients acceptés
-    const formattedAcceptedClients = acceptedClients.map(client => ({
-      ...client,
+    // Formater les clients acceptés depuis ClientCoach
+    const formattedAcceptedClients = clientCoachRelations.map(relation => ({
+      ...relation.client,
       requestStatus: 'accepted',
+      isPrimaryCoach: relation.isPrimary,
+      relationStartDate: relation.startDate,
     }));
 
     // Combiner les deux listes
@@ -115,31 +122,38 @@ export const getClientById = async (req, res) => {
       });
     }
 
-    // Essayer de récupérer le client accepté
-    let client = await prisma.clientProfile.findFirst({
+    // Essayer de récupérer le client via ClientCoach
+    const clientCoachRelation = await prisma.clientCoach.findFirst({
       where: {
-        id,
-        coachId: coachProfile.id, // Vérifier que le client appartient à ce coach
+        clientId: id,
+        coachId: coachProfile.id,
+        isActive: true,
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
+        client: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
       },
     });
 
-    if (client) {
+    if (clientCoachRelation) {
       // Client accepté trouvé
       return res.json({
         success: true,
         data: {
-          ...client,
+          ...clientCoachRelation.client,
           requestStatus: 'accepted',
+          isPrimaryCoach: clientCoachRelation.isPrimary,
+          relationStartDate: clientCoachRelation.startDate,
         },
       });
     }
@@ -215,6 +229,7 @@ export const getMyClientProfile = async (req, res) => {
             birthDate: true,
           },
         },
+        // Coach principal (rétrocompatibilité)
         coach: {
           include: {
             user: {
@@ -224,6 +239,27 @@ export const getMyClientProfile = async (req, res) => {
               },
             },
           },
+        },
+        // Tous les coaches via la relation many-to-many
+        coaches: {
+          where: { isActive: true },
+          include: {
+            coach: {
+              include: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [
+            { isPrimary: 'desc' },
+            { startDate: 'asc' },
+          ],
         },
       },
     });

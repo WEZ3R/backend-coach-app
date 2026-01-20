@@ -24,9 +24,18 @@ export const createRequest = async (req, res) => {
       return sendError(res, 'Profil client non trouvé', 404);
     }
 
-    // Vérifier que le client n'a pas déjà un coach assigné
-    if (clientProfile.coachId) {
-      return sendError(res, 'Vous avez déjà un coach assigné. Utilisez la messagerie pour communiquer avec votre coach.', 400);
+    // Vérifier que le client n'a pas déjà ce coach assigné
+    const existingCoachRelation = await prisma.clientCoach.findUnique({
+      where: {
+        clientId_coachId: {
+          clientId: clientProfile.id,
+          coachId,
+        },
+      },
+    });
+
+    if (existingCoachRelation && existingCoachRelation.isActive) {
+      return sendError(res, 'Ce coach est déjà assigné à votre profil. Utilisez la messagerie pour communiquer avec lui.', 400);
     }
 
     // Vérifier que le coach existe
@@ -210,19 +219,52 @@ export const acceptRequest = async (req, res) => {
       return sendError(res, 'Vous n\'êtes pas autorisé à accepter cette demande', 403);
     }
 
-    // Accepter la demande et assigner le client au coach
-    const [updatedRequest, updatedClient] = await prisma.$transaction([
+    // Vérifier si le client a déjà d'autres coaches
+    const existingCoaches = await prisma.clientCoach.findMany({
+      where: {
+        clientId: request.clientId,
+        isActive: true,
+      },
+    });
+
+    const isPrimary = existingCoaches.length === 0; // Premier coach = coach principal
+
+    // Accepter la demande et créer la relation ClientCoach
+    const [updatedRequest, clientCoachRelation] = await prisma.$transaction([
       prisma.coachRequest.update({
         where: { id: requestId },
         data: { status: 'accepted' },
       }),
-      prisma.clientProfile.update({
-        where: { id: request.clientId },
-        data: { coachId: coachProfile.id },
+      prisma.clientCoach.upsert({
+        where: {
+          clientId_coachId: {
+            clientId: request.clientId,
+            coachId: coachProfile.id,
+          },
+        },
+        update: {
+          isActive: true,
+          isPrimary,
+          startDate: new Date(),
+          endDate: null,
+        },
+        create: {
+          clientId: request.clientId,
+          coachId: coachProfile.id,
+          isPrimary,
+          isActive: true,
+        },
       }),
+      // Mettre à jour coachId pour rétrocompatibilité (si c'est le premier coach)
+      ...(isPrimary ? [
+        prisma.clientProfile.update({
+          where: { id: request.clientId },
+          data: { coachId: coachProfile.id },
+        }),
+      ] : []),
     ]);
 
-    sendSuccess(res, updatedRequest, 'Demande acceptée avec succès');
+    sendSuccess(res, { ...updatedRequest, clientCoachRelation }, 'Demande acceptée avec succès');
   } catch (error) {
     console.error('Accept request error:', error);
     sendError(res, 'Erreur lors de l\'acceptation de la demande', 500);
