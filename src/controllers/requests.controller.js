@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Créer une demande d'entraînement

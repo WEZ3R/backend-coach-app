@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
-
-const prisma = new PrismaClient();
 
 // Récupérer tous les clients d'un coach (y compris les demandes en attente)
 export const getCoachClients = async (req, res) => {
