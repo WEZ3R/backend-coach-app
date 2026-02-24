@@ -8,7 +8,19 @@ const prisma = new PrismaClient();
  */
 export const getAllCoaches = async (req, res) => {
   try {
+    const { city, gym } = req.query;
+
+    // Construire les filtres optionnels
+    const whereFilter = {};
+    if (city) {
+      whereFilter.city = { contains: city, mode: 'insensitive' };
+    }
+    if (gym) {
+      whereFilter.trainingLocations = { has: gym };
+    }
+
     const coaches = await prisma.coachProfile.findMany({
+      where: Object.keys(whereFilter).length > 0 ? whereFilter : undefined,
       include: {
         user: {
           select: {

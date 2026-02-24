@@ -99,6 +99,8 @@ model ClientProfile {
   goals          String?   // Objectifs du client
   level          String?   // Niveau: débutant, intermédiaire, avancé
   profilePicture String?   // URL de la photo de profil
+  city              String?   // Ville du client
+  trainingLocations String[] // Lieux d'entraînement (array)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -262,6 +264,8 @@ model Exercise {
   description String?
   order       Int              @default(0)
   duration    String?          // Durée pour cardio/stretching
+  exerciseRefId String?        // Référence vers ExerciseDB
+  exerciseRef   ExerciseReference? @relation(fields: [exerciseRefId], references: [id])
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -457,4 +461,41 @@ model CoachPost {
 
   @@map("coach_posts")
   @@index([coachId])
+}
+
+// Référentiel d'exercices (ExerciseDB)
+model ExerciseReference {
+  id               String   @id @default(uuid())
+  exerciseDbId     String   @unique  // ID ExerciseDB original
+  name             String
+  bodyParts        String[] // ["CHEST", "SHOULDERS"]
+  targetMuscles    String[] // ["Pectoralis Major"]
+  secondaryMuscles String[] // ["Triceps", "Deltoid"]
+  equipments       String[] // ["BARBELL", "DUMBBELL"]
+  exerciseType     String   // "STRENGTH", "CARDIO", "STRETCHING"...
+  gifUrl           String?  // URL du GIF animé
+  instructions     String[] // Étapes textuelles
+  createdAt        DateTime @default(now())
+
+  // Relation vers les exercices concrets
+  exercises        Exercise[]
+
+  @@map("exercise_references")
+}
+
+// Base Ciqual (ANSES) - Aliments génériques français
+model CiqualFood {
+  id                 String @id @default(uuid())
+  ciqualCode         String @unique
+  name               String
+  groupName          String?
+  energyKcal100g     Float  @default(0)
+  proteins100g       Float  @default(0)
+  carbohydrates100g  Float  @default(0)
+  fat100g            Float  @default(0)
+  fiber100g          Float  @default(0)
+  sugars100g         Float  @default(0)
+  salt100g           Float  @default(0)
+
+  @@map("ciqual_foods")
 }

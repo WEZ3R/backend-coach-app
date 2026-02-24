@@ -95,6 +95,11 @@ export const getCoachPrograms = async (req, res) => {
       where: { coachId: coachProfile.id },
       include: {
         sessions: {
+          include: {
+            exercises: {
+              orderBy: { order: 'asc' },
+            },
+          },
           orderBy: { date: 'asc' },
         },
       },

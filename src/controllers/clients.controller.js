@@ -281,7 +281,7 @@ export const getMyClientProfile = async (req, res) => {
 export const updateMyClientProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { goals, level, weight, height, gender } = req.body;
+    const { goals, level, weight, height, gender, city, trainingLocations } = req.body;
 
     // Récupérer le profil client
     const clientProfile = await prisma.clientProfile.findUnique({
@@ -298,6 +298,19 @@ export const updateMyClientProfile = async (req, res) => {
       profilePicture = `/uploads/${req.file.filename}`;
     }
 
+    // Parser trainingLocations depuis JSON string si nécessaire
+    let parsedTrainingLocations = clientProfile.trainingLocations;
+    if (trainingLocations !== undefined) {
+      try {
+        parsedTrainingLocations =
+          typeof trainingLocations === 'string'
+            ? JSON.parse(trainingLocations)
+            : trainingLocations;
+      } catch {
+        parsedTrainingLocations = clientProfile.trainingLocations;
+      }
+    }
+
     // Mettre à jour le profil
     const updatedProfile = await prisma.clientProfile.update({
       where: { userId },
@@ -307,6 +320,8 @@ export const updateMyClientProfile = async (req, res) => {
         weight: weight ? parseFloat(weight) : clientProfile.weight,
         height: height ? parseFloat(height) : clientProfile.height,
         gender,
+        city: city !== undefined ? city : clientProfile.city,
+        trainingLocations: parsedTrainingLocations,
         profilePicture,
       },
       include: {
@@ -326,5 +341,102 @@ export const updateMyClientProfile = async (req, res) => {
   } catch (error) {
     console.error('Update client profile error:', error);
     sendError(res, 'Erreur lors de la mise à jour du profil', 500);
+  }
+};
+
+/**
+ * Récupérer les clients potentiels (prospection géographique)
+ */
+export const getProspectiveClients = async (req, res) => {
+  try {
+    const coachUserId = req.user.id;
+
+    // Récupérer le profil coach
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: coachUserId },
+    });
+
+    if (!coachProfile) {
+      return sendError(res, 'Profil coach non trouvé', 404);
+    }
+
+    const hasCity = !!coachProfile.city;
+    const hasLocations = coachProfile.trainingLocations && coachProfile.trainingLocations.length > 0;
+
+    if (!hasCity && !hasLocations) {
+      return sendSuccess(res, []);
+    }
+
+    // Récupérer les IDs clients déjà liés (actifs)
+    const linkedClientCoaches = await prisma.clientCoach.findMany({
+      where: { coachId: coachProfile.id, isActive: true },
+      select: { clientId: true },
+    });
+
+    // Récupérer les IDs clients avec demande en cours
+    const pendingRequests = await prisma.coachRequest.findMany({
+      where: { coachId: coachProfile.id, status: 'pending' },
+      select: { clientId: true },
+    });
+
+    const excludedClientIds = [
+      ...linkedClientCoaches.map((cc) => cc.clientId),
+      ...pendingRequests.map((r) => r.clientId),
+    ];
+
+    // Construire les conditions de matching géographique
+    const whereConditions = [];
+    if (hasCity) {
+      whereConditions.push({ city: coachProfile.city });
+    }
+    if (hasLocations) {
+      whereConditions.push({ trainingLocations: { hasSome: coachProfile.trainingLocations } });
+    }
+
+    const prospectiveClients = await prisma.clientProfile.findMany({
+      where: {
+        ...(excludedClientIds.length > 0 && { id: { notIn: excludedClientIds } }),
+        OR: whereConditions,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Calculer le score de matching
+    const scoredClients = prospectiveClients.map((client) => {
+      let score = 0;
+      const cityMatch = !!(hasCity && client.city && coachProfile.city === client.city);
+      if (cityMatch) score += 2;
+
+      const commonLocations = (client.trainingLocations || []).filter((loc) =>
+        coachProfile.trainingLocations.includes(loc)
+      );
+      score += commonLocations.length;
+
+      return {
+        ...client,
+        score,
+        matchDetails: {
+          cityMatch,
+          commonLocations,
+        },
+      };
+    });
+
+    // Trier par score décroissant
+    scoredClients.sort((a, b) => b.score - a.score);
+
+    sendSuccess(res, scoredClients);
+  } catch (error) {
+    console.error('Get prospective clients error:', error);
+    sendError(res, 'Erreur lors de la récupération des clients potentiels', 500);
   }
 };

@@ -61,6 +61,7 @@ export const upsertSession = async (req, res) => {
             videoUrl: ex.videoUrl,
             gifUrl: ex.gifUrl,
             description: ex.description,
+            exerciseRefId: ex.exerciseRefId || null,
             order: index,
           })),
         });
@@ -86,6 +87,7 @@ export const upsertSession = async (req, res) => {
                   videoUrl: ex.videoUrl,
                   gifUrl: ex.gifUrl,
                   description: ex.description,
+                  exerciseRefId: ex.exerciseRefId || null,
                   order: index,
                 })),
               }
@@ -104,6 +106,7 @@ export const upsertSession = async (req, res) => {
             setCompletions: {
               orderBy: { setNumber: 'asc' },
             },
+            exerciseRef: true,
           },
         },
       },
@@ -144,6 +147,7 @@ export const getSessionsByProgram = async (req, res) => {
             setCompletions: {
               orderBy: { setNumber: 'asc' },
             },
+            exerciseRef: true,
           },
         },
         comments: true,
@@ -174,6 +178,7 @@ export const getSessionById = async (req, res) => {
             setCompletions: {
               orderBy: { setNumber: 'asc' },
             },
+            exerciseRef: true,
           },
         },
         comments: true,
@@ -228,6 +233,7 @@ export const validateSession = async (req, res) => {
             setCompletions: {
               orderBy: { setNumber: 'asc' },
             },
+            exerciseRef: true,
           },
         },
       },

@@ -5,7 +5,8 @@ import {
   getCoachClients,
   getClientById,
   getMyClientProfile,
-  updateMyClientProfile
+  updateMyClientProfile,
+  getProspectiveClients,
 } from '../controllers/clients.controller.js';
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.put('/me', authorize('CLIENT'), upload.single('profilePicture'), updateMy
 
 // Routes pour les coaches
 router.get('/coach', authorize('COACH'), getCoachClients);
+router.get('/prospection', authorize('COACH'), getProspectiveClients);
 router.get('/:id', authorize('COACH'), getClientById);
 
 export default router;

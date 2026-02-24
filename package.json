@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "node src/prisma/seed.js",
+    "db:host": "node scripts/detect-db-host.js",
     "db:backup": "cd scripts && ./export-database.sh",
     "db:restore": "cd scripts && ./import-database.sh"
   },
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.3",
-    "prisma": "^5.9.1"
+    "prisma": "^5.9.1",
+    "xlsx": "^0.18.5"
   }
 }
