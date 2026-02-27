@@ -21,6 +21,8 @@ import setCompletionRoutes from './routes/setCompletions.js';
 import clientCoachRoutes from './routes/clientCoach.js';
 import foodRoutes from './routes/food.js';
 import exerciseRefRoutes from './routes/exerciseRefs.js';
+import appointmentRoutes from './routes/appointments.js';
+import './jobs/appointmentReminders.js';
 
 const app = express();
 
@@ -54,6 +56,7 @@ app.use('/api/set-completions', setCompletionRoutes);
 app.use('/api/client-coaches', clientCoachRoutes);
 app.use('/api/food', foodRoutes);
 app.use('/api/exercise-refs', exerciseRefRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {
