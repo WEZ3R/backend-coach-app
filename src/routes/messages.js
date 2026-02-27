@@ -1,5 +1,5 @@
 import express from 'express';
-import { sendMessage, getConversation, getClientTips, markAsRead, deleteMessage } from '../controllers/messageController.js';
+import { sendMessage, getConversation, getClientTips, markAsRead, deleteMessage, getUnreadCount, getUnreadCountsByConversation, markConversationAsRead } from '../controllers/messageController.js';
 import { authenticate } from '../middlewares/auth.js';
 
 const router = express.Router();
@@ -8,6 +8,9 @@ const router = express.Router();
 router.use(authenticate);
 
 // Routes pour les messages
+router.get('/unread-count', getUnreadCount);
+router.get('/unread-counts', getUnreadCountsByConversation);
+router.patch('/conversation/:coachId/:clientId/read', markConversationAsRead);
 router.post('/', sendMessage);
 router.get('/conversation/:coachId/:clientId', getConversation);
 router.get('/tips/client/:clientId', getClientTips);
