@@ -22,6 +22,7 @@ import clientCoachRoutes from './routes/clientCoach.js';
 import foodRoutes from './routes/food.js';
 import exerciseRefRoutes from './routes/exerciseRefs.js';
 import appointmentRoutes from './routes/appointments.js';
+import availabilityRoutes from './routes/availability.js';
 import './jobs/appointmentReminders.js';
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/client-coaches', clientCoachRoutes);
 app.use('/api/food', foodRoutes);
 app.use('/api/exercise-refs', exerciseRefRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/availability', availabilityRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {

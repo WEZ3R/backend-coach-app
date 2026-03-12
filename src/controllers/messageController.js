@@ -37,7 +37,24 @@ export const getConversation = async (req, res) => {
       where: {
         coachId,
         clientId,
-        type: 'CHAT',
+        type: { in: ['CHAT', 'APPOINTMENT_PROPOSAL'] },
+      },
+      include: {
+        appointment: {
+          select: {
+            id: true,
+            title: true,
+            startAt: true,
+            endAt: true,
+            durationMinutes: true,
+            meetingType: true,
+            locationType: true,
+            locationDetail: true,
+            status: true,
+            rrule: true,
+            parentId: true,
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });

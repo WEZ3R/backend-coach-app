@@ -21,16 +21,48 @@ const checkConflict = async (coachId, clientId, startAt, endAt, excludeId = null
   return conflict;
 };
 
-// POST /api/appointments — COACH uniquement
+// POST /api/appointments — COACH ou CLIENT
 export const createAppointment = async (req, res) => {
   try {
-    const { title, clientId, startAt, durationMinutes, locationType, locationDetail, rrule } = req.body;
+    const { title, clientId, coachId, startAt, durationMinutes, locationType, locationDetail, meetingType, rrule } = req.body;
 
-    // Récupérer le profil coach
-    const coachProfile = await prisma.coachProfile.findUnique({
-      where: { userId: req.user.id },
-    });
-    if (!coachProfile) return sendError(res, 'Profil coach introuvable', 404);
+    const isCoach = req.user.role === 'COACH';
+
+    let coachProfile;
+    let resolvedClientId = clientId;
+
+    if (isCoach) {
+      // Récupérer le profil coach
+      coachProfile = await prisma.coachProfile.findUnique({
+        where: { userId: req.user.id },
+      });
+      if (!coachProfile) return sendError(res, 'Profil coach introuvable', 404);
+    } else {
+      // CLIENT : doit fournir coachId, ne peut pas utiliser rrule
+      if (rrule) return sendError(res, 'Les clients ne peuvent pas créer de RDV récurrents', 403);
+      if (!coachId) return sendError(res, 'Le coachId est requis', 400);
+
+      const clientProfile = await prisma.clientProfile.findUnique({
+        where: { userId: req.user.id },
+        select: { id: true },
+      });
+      if (!clientProfile) return sendError(res, 'Profil client introuvable', 404);
+
+      coachProfile = await prisma.coachProfile.findUnique({
+        where: { id: coachId },
+      });
+      if (!coachProfile) return sendError(res, 'Coach introuvable', 404);
+
+      // Vérifier si le client est bloqué par ce coach
+      const block = await prisma.coachClientBlock.findUnique({
+        where: { coachId_clientId: { coachId, clientId: clientProfile.id } },
+      });
+      if (block && (!block.blockedUntil || new Date(block.blockedUntil) > new Date())) {
+        return sendError(res, 'Vous ne pouvez pas proposer de RDV à ce coach pour le moment', 403);
+      }
+
+      resolvedClientId = clientProfile.id;
+    }
 
     // Validation des champs requis
     if (!title) return sendError(res, 'Le titre est requis', 400);
@@ -41,52 +73,52 @@ export const createAppointment = async (req, res) => {
     const startDate = new Date(startAt);
     const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
-    // Statut selon présence du client
-    const status = clientId ? 'PROPOSED' : 'CONFIRMED';
+    // Statut : toujours PROPOSED si client présent, CONFIRMED sinon (coach sans client)
+    const status = resolvedClientId ? 'PROPOSED' : 'CONFIRMED';
+    const isSentByCoach = isCoach;
 
     // Vérification de conflit (uniquement si CONFIRMED)
-    if (!clientId) {
+    if (!resolvedClientId) {
       const conflict = await checkConflict(coachProfile.id, null, startDate, endDate);
       if (conflict) return sendError(res, 'Conflit de planning : un RDV existe déjà sur ce créneau', 409);
     }
 
     if (rrule) {
-      // Création d'une série récurrente
+      // Création d'une série récurrente (COACH uniquement, déjà vérifié)
       const parent = await prisma.appointment.create({
         data: {
           title,
           coachId: coachProfile.id,
-          ...(clientId ? { clientId } : {}),
+          ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
           startAt: startDate,
           endAt: endDate,
           durationMinutes,
           locationType,
           ...(locationDetail ? { locationDetail } : {}),
+          ...(meetingType ? { meetingType } : {}),
           status,
           rrule,
         },
       });
 
       // Générer les occurrences via rrule, limitées à 1 an
-      // Extraire uniquement la partie RRULE (sans DTSTART) pour RRule.parseString
       const rruleStr = rrule.startsWith('RRULE:') ? rrule.slice(6) : rrule;
       const rule = new RRule({ ...RRule.parseString(rruleStr), dtstart: startDate });
       const oneYearLater = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
-      // all() respecte COUNT ; on filtre à 1 an
       const dates = rule.all((date) => date <= oneYearLater);
 
-      // Créer les occurrences enfants
       if (dates.length > 0) {
         await prisma.appointment.createMany({
           data: dates.map((date) => ({
             title,
             coachId: coachProfile.id,
-            ...(clientId ? { clientId } : {}),
+            ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
             startAt: date,
             endAt: new Date(date.getTime() + durationMinutes * 60000),
             durationMinutes,
             locationType,
             ...(locationDetail ? { locationDetail } : {}),
+            ...(meetingType ? { meetingType } : {}),
             status,
             parentId: parent.id,
           })),
@@ -95,14 +127,14 @@ export const createAppointment = async (req, res) => {
 
       // Créer le message de proposition si clientId présent
       let message = null;
-      if (clientId) {
+      if (resolvedClientId) {
         message = await prisma.message.create({
           data: {
             coachId: coachProfile.id,
-            clientId,
+            clientId: resolvedClientId,
             content: `Nouvelle proposition de RDV : « ${title} » le ${startDate.toLocaleDateString('fr-FR')}.`,
             type: 'APPOINTMENT_PROPOSAL',
-            isSentByCoach: true,
+            isSentByCoach,
             appointmentId: parent.id,
           },
         });
@@ -120,26 +152,27 @@ export const createAppointment = async (req, res) => {
       data: {
         title,
         coachId: coachProfile.id,
-        ...(clientId ? { clientId } : {}),
+        ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
         startAt: startDate,
         endAt: endDate,
         durationMinutes,
         locationType,
         ...(locationDetail ? { locationDetail } : {}),
+        ...(meetingType ? { meetingType } : {}),
         status,
       },
     });
 
     // Créer le message de proposition si clientId présent
     let message = null;
-    if (clientId) {
+    if (resolvedClientId) {
       message = await prisma.message.create({
         data: {
           coachId: coachProfile.id,
-          clientId,
+          clientId: resolvedClientId,
           content: `Nouvelle proposition de RDV : « ${title} » le ${startDate.toLocaleDateString('fr-FR')}.`,
           type: 'APPOINTMENT_PROPOSAL',
-          isSentByCoach: true,
+          isSentByCoach,
           appointmentId: appointment.id,
         },
       });

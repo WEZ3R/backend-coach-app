@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "seed": "node prisma/seed.js",
     "prisma:seed": "node src/prisma/seed.js",
     "db:host": "node scripts/detect-db-host.js",
     "db:backup": "cd scripts && ./export-database.sh",

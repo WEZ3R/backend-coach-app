@@ -17,24 +17,60 @@ export const getCoachClients = async (req, res) => {
 
     const coachId = coachProfile.id;
 
-    const clients = await prisma.clientProfile.findMany({
-      where: {
-        coachId: coachId,
-      },
+    // Récupérer via la relation many-to-many pour couvrir tous les clients du coach
+    const clientCoachRelations = await prisma.clientCoach.findMany({
+      where: { coachId, isActive: true },
       include: {
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
+        client: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                birthDate: true,
+              },
+            },
           },
         },
       },
     });
 
-    const clientList = clients.map(client => ({
-      id: client.id,
-      name: `${client.user.firstName} ${client.user.lastName}`,
-    }));
+    // Récupérer le programme actif pour chaque client
+    const clientIds = clientCoachRelations.map(r => r.client.id);
+    const activePrograms = await prisma.program.findMany({
+      where: { coachId, clientId: { in: clientIds }, isActive: true },
+      select: { id: true, clientId: true, title: true },
+    });
+    const programByClient = Object.fromEntries(
+      activePrograms.map(p => [p.clientId, p])
+    );
+
+    const clientList = clientCoachRelations.map(({ client }) => {
+      // Calculer l'âge depuis dateOfBirth (profil) ou birthDate (user)
+      const dob = client.dateOfBirth ?? client.user.birthDate;
+      let age = null;
+      if (dob) {
+        const today = new Date();
+        const birth = new Date(dob);
+        age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      }
+
+      const prog = programByClient[client.id];
+
+      return {
+        id:        client.id,
+        name:      `${client.user.firstName} ${client.user.lastName}`,
+        gender:    client.gender ?? null,
+        age,
+        weight:    client.weight ?? null,
+        height:    client.height ?? null,
+        level:     client.level ?? null,
+        program:   prog?.title ?? null,
+        programId: prog?.id ?? null,
+      };
+    });
 
     sendSuccess(res, clientList);
   } catch (error) {

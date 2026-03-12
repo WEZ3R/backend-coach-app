@@ -13,7 +13,7 @@ import {
 const router = express.Router();
 router.use(authenticate);
 
-router.post('/',              authorize('COACH'),  createAppointment);
+router.post('/',                                  createAppointment);
 router.get('/',                                   getAppointments);
 router.get('/upcoming',                           getUpcomingAppointments);
 router.get('/:id',                                getAppointmentById);
