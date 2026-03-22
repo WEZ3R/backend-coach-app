@@ -8,6 +8,30 @@ export const upsertSession = async (req, res) => {
   try {
     const { id, programId, date, status, isRestDay, notes, exercises } = req.body;
 
+    // Vérifier que le coach est propriétaire du programme
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+    if (!coachProfile) {
+      return sendError(res, 'Profil coach non trouvé', 404);
+    }
+
+    const resolvedProgramId = id
+      ? (await prisma.session.findUnique({ where: { id }, select: { programId: true } }))?.programId
+      : programId;
+
+    if (!resolvedProgramId) {
+      return sendError(res, 'Programme introuvable', 404);
+    }
+
+    const program = await prisma.program.findUnique({ where: { id: resolvedProgramId } });
+    if (!program) {
+      return sendError(res, 'Programme non trouvé', 404);
+    }
+    if (program.coachId !== coachProfile.id) {
+      return sendError(res, 'Accès non autorisé à ce programme', 403);
+    }
+
     // Vérifier si la session existe déjà
     let existingSession = null;
 
@@ -41,30 +65,31 @@ export const upsertSession = async (req, res) => {
         },
       });
 
-      // Si des exercices sont fournis, les remplacer
-      if (exercises && exercises.length > 0) {
-        // Supprimer les anciens exercices
+      // Remplacer les exercices (même si la liste est vide)
+      if (exercises !== undefined) {
         await prisma.exercise.deleteMany({
           where: { sessionId: session.id },
         });
 
-        // Créer les nouveaux exercices
-        await prisma.exercise.createMany({
-          data: exercises.map((ex, index) => ({
-            sessionId: session.id,
-            name: ex.name,
-            category: ex.category,
-            sets: ex.sets,
-            reps: ex.reps,
-            weight: ex.weight,
-            restTime: ex.restTime,
-            videoUrl: ex.videoUrl,
-            gifUrl: ex.gifUrl,
-            description: ex.description,
-            exerciseRefId: ex.exerciseRefId || null,
-            order: index,
-          })),
-        });
+        if (exercises.length > 0) {
+          await prisma.exercise.createMany({
+            data: exercises.map((ex, index) => ({
+              sessionId: session.id,
+              name: ex.name,
+              category: ex.category,
+              sets: ex.sets ?? null,
+              reps: ex.reps || null,
+              weight: ex.weight || null,
+              duration: ex.duration || null,
+              restTime: ex.restTime || null,
+              videoUrl: ex.videoUrl || null,
+              gifUrl: ex.gifUrl || null,
+              description: ex.description || null,
+              exerciseRefId: ex.exerciseRefId || null,
+              order: index,
+            })),
+          });
+        }
       }
     } else {
       // Créer une nouvelle session
@@ -80,13 +105,14 @@ export const upsertSession = async (req, res) => {
                 create: exercises.map((ex, index) => ({
                   name: ex.name,
                   category: ex.category,
-                  sets: ex.sets,
-                  reps: ex.reps,
-                  weight: ex.weight,
-                  restTime: ex.restTime,
-                  videoUrl: ex.videoUrl,
-                  gifUrl: ex.gifUrl,
-                  description: ex.description,
+                  sets: ex.sets ?? null,
+                  reps: ex.reps || null,
+                  weight: ex.weight || null,
+                  duration: ex.duration || null,
+                  restTime: ex.restTime || null,
+                  videoUrl: ex.videoUrl || null,
+                  gifUrl: ex.gifUrl || null,
+                  description: ex.description || null,
                   exerciseRefId: ex.exerciseRefId || null,
                   order: index,
                 })),
@@ -202,6 +228,25 @@ export const getSessionById = async (req, res) => {
 export const deleteSession = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Vérifier que le coach est propriétaire de la session
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+    if (!coachProfile) {
+      return sendError(res, 'Profil coach non trouvé', 404);
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { id },
+      include: { program: { select: { coachId: true } } },
+    });
+    if (!session) {
+      return sendError(res, 'Session non trouvée', 404);
+    }
+    if (session.program.coachId !== coachProfile.id) {
+      return sendError(res, 'Accès non autorisé à cette session', 403);
+    }
 
     await prisma.session.delete({
       where: { id },

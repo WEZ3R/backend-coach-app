@@ -51,12 +51,41 @@ export const upsertDailyStat = async (req, res) => {
 };
 
 /**
+ * Vérifier que l'utilisateur a accès aux stats d'un client
+ * Retourne true si accès autorisé, false sinon
+ */
+async function canAccessClientStats(userId, clientId) {
+  // Le client accède à ses propres stats
+  const clientProfile = await prisma.clientProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (clientProfile?.id === clientId) return true;
+
+  // Le coach accède aux stats d'un de ses clients
+  const coachProfile = await prisma.coachProfile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!coachProfile) return false;
+
+  const relation = await prisma.clientCoach.findFirst({
+    where: { coachId: coachProfile.id, clientId, isActive: true },
+  });
+  return !!relation;
+}
+
+/**
  * Récupérer les stats d'un client
  */
 export const getClientStats = async (req, res) => {
   try {
     const { clientId } = req.params;
     const { startDate, endDate } = req.query;
+
+    if (!(await canAccessClientStats(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const where = {
       clientId,
@@ -87,7 +116,11 @@ export const getClientStats = async (req, res) => {
 export const getAggregatedStats = async (req, res) => {
   try {
     const { clientId } = req.params;
-    const { startDate, endDate, period } = req.query; // period: 'day', 'week', 'month'
+    const { startDate, endDate, period } = req.query;
+
+    if (!(await canAccessClientStats(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const where = {
       clientId,
@@ -157,6 +190,10 @@ export const getAggregatedStats = async (req, res) => {
 export const getStatByDate = async (req, res) => {
   try {
     const { clientId, date } = req.params;
+
+    if (!(await canAccessClientStats(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const dateObj = new Date(date);
     dateObj.setHours(0, 0, 0, 0);

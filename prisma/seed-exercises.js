@@ -1,145 +1,136 @@
 /**
- * Script de seed pour le référentiel d'exercices (free-exercise-db)
+ * Script de seed pour le référentiel d'exercices (bootstrapping-lab/exercisedb-api)
  *
- * Télécharge le dataset depuis GitHub et insère dans la table exercise_references.
- *
- * Format source : { name, force, level, mechanic, equipment, primaryMuscles[], secondaryMuscles[], instructions[], category, images[], id }
+ * Source gratuite, 1500 exercices avec vrais GIFs animés.
+ * Format source : { exerciseId, name, gifUrl, targetMuscles[], bodyParts[], equipments[], secondaryMuscles[], instructions[] }
  *
  * Usage : node prisma/seed-exercises.js
  */
 
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: resolve(__dirname, '../.env') });
+
+if (!process.env.DATABASE_URL) {
+  const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME } = process.env;
+  process.env.DATABASE_URL = `postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`;
+}
 
 const prisma = new PrismaClient();
 
-const EXERCISEDB_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
+const SOURCE_URL = 'https://raw.githubusercontent.com/bootstrapping-lab/exercisedb-api/main/src/data/exercises.json';
 
-// Mapping primaryMuscle → bodyPart normalisé
-const muscleToBodyPart = (muscles) => {
+// bodyParts → valeurs normalisées
+const normalizeBodyParts = (parts = []) => {
   const map = {
-    'abdominals': 'WAIST',
-    'abductors': 'UPPER_LEGS',
-    'adductors': 'UPPER_LEGS',
-    'biceps': 'UPPER_ARMS',
-    'calves': 'LOWER_LEGS',
-    'chest': 'CHEST',
-    'forearms': 'LOWER_ARMS',
-    'glutes': 'UPPER_LEGS',
-    'hamstrings': 'UPPER_LEGS',
-    'lats': 'BACK',
-    'lower back': 'BACK',
-    'middle back': 'BACK',
-    'traps': 'BACK',
-    'neck': 'NECK',
-    'quadriceps': 'UPPER_LEGS',
-    'shoulders': 'SHOULDERS',
-    'triceps': 'UPPER_ARMS',
+    'back':         'BACK',
+    'cardio':       'CARDIO',
+    'chest':        'CHEST',
+    'lower arms':   'LOWER_ARMS',
+    'lower legs':   'LOWER_LEGS',
+    'neck':         'NECK',
+    'shoulders':    'SHOULDERS',
+    'upper arms':   'UPPER_ARMS',
+    'upper legs':   'UPPER_LEGS',
+    'waist':        'WAIST',
   };
-  const parts = new Set();
-  for (const m of muscles) {
-    parts.add(map[m?.toLowerCase()] || 'OTHER');
-  }
-  return [...parts];
+  return parts.map(p => map[p?.toLowerCase()] || 'OTHER');
 };
 
-// Mapping equipment → valeur normalisée
-const normalizeEquipment = (equipment) => {
+// equipments → valeurs normalisées
+const normalizeEquipments = (equips = []) => {
   const map = {
-    'barbell': 'BARBELL',
-    'dumbbell': 'DUMBBELL',
-    'body only': 'BODYWEIGHT',
-    'cable': 'CABLE',
-    'machine': 'MACHINE',
-    'bands': 'BAND',
-    'kettlebells': 'KETTLEBELL',
-    'medicine ball': 'MEDICINE_BALL',
-    'exercise ball': 'STABILITY_BALL',
-    'e-z curl bar': 'EZ_BARBELL',
-    'foam roll': 'ROLLER',
-    'other': 'OTHER',
-    'none': 'BODYWEIGHT',
+    'barbell':          'BARBELL',
+    'dumbbell':         'DUMBBELL',
+    'body weight':      'BODYWEIGHT',
+    'cable':            'CABLE',
+    'machine':          'MACHINE',
+    'band':             'BAND',
+    'kettlebell':       'KETTLEBELL',
+    'medicine ball':    'MEDICINE_BALL',
+    'stability ball':   'STABILITY_BALL',
+    'ez barbell':       'EZ_BARBELL',
+    'roller':           'ROLLER',
+    'smith machine':    'SMITH_MACHINE',
+    'assisted':         'MACHINE',
+    'leverage machine': 'MACHINE',
+    'olympic barbell':  'BARBELL',
+    'trap bar':         'BARBELL',
   };
-  return map[equipment?.toLowerCase()] || equipment?.toUpperCase().replace(/\s+/g, '_') || 'OTHER';
+  return equips.map(e => map[e?.toLowerCase()] || e?.toUpperCase().replace(/\s+/g, '_') || 'OTHER');
 };
 
-// Mapper category → exerciseType
-const mapCategory = (category) => {
-  const map = {
-    'strength': 'STRENGTH',
-    'stretching': 'STRETCHING',
-    'plyometrics': 'PLYOMETRICS',
-    'strongman': 'STRENGTH',
-    'powerlifting': 'STRENGTH',
-    'cardio': 'CARDIO',
-    'olympic weightlifting': 'STRENGTH',
-  };
-  return map[category?.toLowerCase()] || 'STRENGTH';
+// bodyParts → exerciseType
+const mapExerciseType = (parts = []) => {
+  if (parts.some(p => p?.toLowerCase() === 'cardio')) return 'CARDIO';
+  return 'STRENGTH';
 };
 
 async function seed() {
-  console.log('Téléchargement du dataset free-exercise-db...');
+  console.log('');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('  🏋️  ExerciseDB Seed (GIFs gratuits) – démarrage');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  const response = await fetch(EXERCISEDB_URL);
-  if (!response.ok) {
-    throw new Error(`Erreur HTTP ${response.status} lors du téléchargement`);
-  }
+  console.log('📡 Téléchargement du dataset (1500 exercices)...');
+  const response = await fetch(SOURCE_URL);
+  if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
 
   const exercises = await response.json();
-  console.log(`${exercises.length} exercices trouvés dans le dataset`);
+  console.log(`✅ ${exercises.length} exercices récupérés\n`);
 
   const existingCount = await prisma.exerciseReference.count();
-  console.log(`${existingCount} exercices déjà en base`);
+  console.log(`📦 ${existingCount} exercices actuellement en base`);
+  console.log('🔄 Mise à jour en cours...\n');
 
   let inserted = 0;
   let skipped = 0;
 
   for (const ex of exercises) {
-    const exerciseDbId = ex.id;
-    const primaryMuscles = ex.primaryMuscles || [];
-    const secondaryMuscles = ex.secondaryMuscles || [];
-
-    // Construire l'URL du GIF depuis le repo GitHub
-    const gifUrl = `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${exerciseDbId}.gif`;
-
     const data = {
-      name: ex.name,
-      bodyParts: muscleToBodyPart(primaryMuscles),
-      targetMuscles: primaryMuscles,
-      secondaryMuscles: secondaryMuscles,
-      equipments: [normalizeEquipment(ex.equipment)],
-      exerciseType: mapCategory(ex.category),
-      gifUrl,
-      instructions: ex.instructions || [],
+      name:             ex.name,
+      bodyParts:        normalizeBodyParts(ex.bodyParts),
+      targetMuscles:    ex.targetMuscles || [],
+      secondaryMuscles: ex.secondaryMuscles || [],
+      equipments:       normalizeEquipments(ex.equipments),
+      exerciseType:     mapExerciseType(ex.bodyParts),
+      gifUrl:           ex.gifUrl || null,
+      instructions:     ex.instructions || [],
     };
 
     try {
       await prisma.exerciseReference.upsert({
-        where: { exerciseDbId },
+        where:  { exerciseDbId: ex.exerciseId },
         update: data,
-        create: { exerciseDbId, ...data },
+        create: { exerciseDbId: ex.exerciseId, ...data },
       });
       inserted++;
     } catch (error) {
-      console.error(`Erreur pour l'exercice ${ex.name} (${exerciseDbId}):`, error.message);
+      console.error(`  ❌ ${ex.name} (${ex.exerciseId}) :`, error.message);
       skipped++;
     }
 
     if ((inserted + skipped) % 100 === 0) {
-      console.log(`Progression: ${inserted} insérés, ${skipped} erreurs sur ${exercises.length}`);
+      process.stdout.write(`  ${inserted + skipped}/${exercises.length}...\r`);
     }
   }
 
-  console.log(`\nSeed terminé !`);
-  console.log(`  - ${inserted} exercices insérés/mis à jour`);
-  console.log(`  - ${skipped} erreurs`);
-  console.log(`  - Total en base: ${await prisma.exerciseReference.count()}`);
+  const total = await prisma.exerciseReference.count();
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('  ✅  Seed terminé !');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`  • ${inserted} exercices insérés/mis à jour`);
+  console.log(`  • ${skipped} erreurs`);
+  console.log(`  • ${total} exercices en base\n`);
 }
 
 seed()
   .catch((error) => {
-    console.error('Erreur lors du seed:', error);
+    console.error('\n❌ Erreur :', error.message);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

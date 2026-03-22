@@ -24,17 +24,16 @@ export const createProgram = async (req, res) => {
     } = req.body;
     const coachId = req.user.id;
 
-    // Vérifier que le coach a bien ce client
+    // Vérifier que le coach a bien ce client (ancienne relation directe OU nouvelle table M2M)
     const coachProfile = await prisma.coachProfile.findUnique({
       where: { userId: coachId },
       include: {
-        clients: {
-          where: { id: clientId },
-        },
+        clients: { where: { id: clientId } },
+        clientCoaches: { where: { clientId, isActive: true } },
       },
     });
 
-    if (!coachProfile || coachProfile.clients.length === 0) {
+    if (!coachProfile || (coachProfile.clients.length === 0 && coachProfile.clientCoaches.length === 0)) {
       return sendError(res, 'Client not found or not assigned to this coach', 403);
     }
 
@@ -118,9 +117,18 @@ export const getCoachPrograms = async (req, res) => {
  */
 export const getClientPrograms = async (req, res) => {
   try {
-    // Le clientId dans la table Program correspond au User ID, pas au ClientProfile ID
+    // clientId dans Program = ClientProfile.id (pas User.id)
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true },
+    });
+
+    if (!clientProfile) {
+      return sendSuccess(res, []);
+    }
+
     const programs = await prisma.program.findMany({
-      where: { clientId: req.user.id },
+      where: { clientId: clientProfile.id },
       include: {
         sessions: {
           include: {

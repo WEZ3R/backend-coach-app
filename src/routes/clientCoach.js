@@ -6,7 +6,7 @@ import {
   setPrimaryCoach,
   removeCoachFromClient,
 } from '../controllers/clientCoachController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, authorize } from '../middlewares/auth.js';
 
 const router = express.Router();
 
@@ -14,7 +14,7 @@ const router = express.Router();
 router.use(authenticate);
 
 // Routes pour la gestion des relations client-coach
-router.post('/', addCoachToClient);
+router.post('/', authorize('COACH'), addCoachToClient);
 router.get('/client/:clientId', getClientCoaches);
 router.get('/coach/:coachId', getCoachClients);
 router.patch('/:id/primary', setPrimaryCoach);
