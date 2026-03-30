@@ -85,35 +85,25 @@ export const getCoachClients = async (req, res) => {
 export const getClientStats = async (req, res) => {
   try {
     const { clientIds, startDate, endDate, metrics } = req.query;
-    console.log('=== getClientStats called ===');
-    console.log('req.query:', req.query);
-    console.log('req.user:', req.user);
 
     // Récupérer le profil coach
     const coachProfile = await prisma.coachProfile.findUnique({
       where: { userId: req.user.id },
     });
 
-    console.log('coachProfile:', coachProfile);
-
     if (!coachProfile) {
-      console.log('ERROR: No coachProfile found');
       return sendError(res, 'Profil coach non trouvé', 403);
     }
 
     const coachId = coachProfile.id;
-    console.log('coachId:', coachId);
 
     // Si clientIds est fourni, le parser, sinon récupérer tous les clients du coach
     let whereClause = { coachId: coachId };
 
     if (clientIds) {
       const clientIdArray = Array.isArray(clientIds) ? clientIds : [clientIds];
-      console.log('clientIdArray:', clientIdArray);
       whereClause.id = { in: clientIdArray };
     }
-
-    console.log('whereClause:', whereClause);
 
     // Récupérer les clients du coach (tous ou filtrés)
     const clients = await prisma.clientProfile.findMany({

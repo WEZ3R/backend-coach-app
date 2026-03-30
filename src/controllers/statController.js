@@ -9,6 +9,33 @@ export const upsertDailyStat = async (req, res) => {
     const { clientId, date, sleepHours, bedTime, wakeTime, waterIntake, weight, workoutTime, workoutDuration, notes } =
       req.body;
 
+    // Vérifier l'autorisation sur le clientId
+    const userRole = req.user.role;
+
+    if (userRole === 'CLIENT') {
+      const clientProfile = await prisma.clientProfile.findUnique({
+        where: { userId: req.user.id },
+        select: { id: true },
+      });
+      if (!clientProfile || clientProfile.id !== clientId) {
+        return sendError(res, 'Vous n\'êtes pas autorisé à modifier les stats de ce client', 403);
+      }
+    } else if (userRole === 'COACH') {
+      const coachProfile = await prisma.coachProfile.findUnique({
+        where: { userId: req.user.id },
+        select: { id: true },
+      });
+      if (!coachProfile) {
+        return sendError(res, 'Vous n\'êtes pas autorisé à modifier les stats de ce client', 403);
+      }
+      const relation = await prisma.clientCoach.findFirst({
+        where: { coachId: coachProfile.id, clientId, isActive: true },
+      });
+      if (!relation) {
+        return sendError(res, 'Vous n\'êtes pas autorisé à modifier les stats de ce client', 403);
+      }
+    }
+
     const dateObj = new Date(date);
     dateObj.setHours(0, 0, 0, 0);
 

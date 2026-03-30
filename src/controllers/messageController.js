@@ -8,6 +8,11 @@ export const sendMessage = async (req, res) => {
   try {
     const { coachId, clientId, content, type, scheduledTime, isSentByCoach } = req.body;
 
+    // Valider que coachId et clientId sont fournis
+    if (!coachId || !clientId) {
+      return sendError(res, 'coachId et clientId sont requis', 400);
+    }
+
     const message = await prisma.message.create({
       data: {
         coachId,

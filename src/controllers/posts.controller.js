@@ -68,8 +68,14 @@ export const getCoachPosts = async (req, res) => {
     const { coachId } = req.params;
     const { limit = 20, offset = 0 } = req.query;
 
+    const take = Math.max(1, Math.min(parseInt(limit) || 20, 100));
+    const skip = Math.max(0, parseInt(offset) || 0);
+
     // Vérifier si c'est une requête publique ou du coach lui-même
-    const isOwner = req.user?.coachProfile?.id === coachId;
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+    const isOwner = coachProfile?.id === coachId;
 
     const posts = await prisma.coachPost.findMany({
       where: {
@@ -91,8 +97,8 @@ export const getCoachPosts = async (req, res) => {
       orderBy: {
         createdAt: 'desc',
       },
-      take: parseInt(limit),
-      skip: parseInt(offset),
+      take,
+      skip,
     });
 
     sendSuccess(res, posts);
@@ -109,6 +115,9 @@ export const getMyPosts = async (req, res) => {
   try {
     const userId = req.user.id;
     const { limit = 20, offset = 0 } = req.query;
+
+    const take = Math.max(1, Math.min(parseInt(limit) || 20, 100));
+    const skip = Math.max(0, parseInt(offset) || 0);
 
     // Récupérer le profil coach
     const coachProfile = await prisma.coachProfile.findUnique({
@@ -138,8 +147,8 @@ export const getMyPosts = async (req, res) => {
       orderBy: {
         createdAt: 'desc',
       },
-      take: parseInt(limit),
-      skip: parseInt(offset),
+      take,
+      skip,
     });
 
     sendSuccess(res, posts);

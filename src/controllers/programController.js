@@ -178,6 +178,21 @@ export const getProgramById = async (req, res) => {
       return sendError(res, 'Program not found', 404);
     }
 
+    // Vérifier que l'utilisateur a accès au programme (coach propriétaire ou client assigné)
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    const isCoachOwner = coachProfile && program.coachId === coachProfile.id;
+    const isAssignedClient = clientProfile && program.clientId === clientProfile.id;
+
+    if (!isCoachOwner && !isAssignedClient) {
+      return sendError(res, 'Vous n\'avez pas accès à ce programme', 403);
+    }
+
     sendSuccess(res, program);
   } catch (error) {
     console.error('Get program error:', error);
@@ -192,6 +207,24 @@ export const updateProgram = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, cycleDays, endDate, isActive } = req.body;
+
+    // Vérifier que le programme existe
+    const existingProgram = await prisma.program.findUnique({
+      where: { id },
+    });
+
+    if (!existingProgram) {
+      return sendError(res, 'Program not found', 404);
+    }
+
+    // Vérifier que le coach est propriétaire du programme
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!coachProfile || existingProgram.coachId !== coachProfile.id) {
+      return sendError(res, 'Vous n\'êtes pas autorisé à modifier ce programme', 403);
+    }
 
     const program = await prisma.program.update({
       where: { id },
@@ -217,6 +250,24 @@ export const updateProgram = async (req, res) => {
 export const deleteProgram = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Vérifier que le programme existe
+    const existingProgram = await prisma.program.findUnique({
+      where: { id },
+    });
+
+    if (!existingProgram) {
+      return sendError(res, 'Program not found', 404);
+    }
+
+    // Vérifier que le coach est propriétaire du programme
+    const coachProfile = await prisma.coachProfile.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!coachProfile || existingProgram.coachId !== coachProfile.id) {
+      return sendError(res, 'Vous n\'êtes pas autorisé à supprimer ce programme', 403);
+    }
 
     await prisma.program.delete({
       where: { id },

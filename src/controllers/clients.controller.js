@@ -12,10 +12,7 @@ export const getCoachClients = async (req, res) => {
     });
 
     if (!coachProfile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Profil coach non trouvé',
-      });
+      return sendError(res, 'Profil coach non trouvé', 404);
     }
 
     // Récupérer tous les clients via la table ClientCoach (relation many-to-many)
@@ -88,17 +85,10 @@ export const getCoachClients = async (req, res) => {
     // Combiner les deux listes
     const allClients = [...formattedPendingRequests, ...formattedAcceptedClients];
 
-    res.json({
-      success: true,
-      data: allClients,
-    });
+    sendSuccess(res, allClients);
   } catch (error) {
     console.error('Error fetching coach clients:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération des clients',
-      error: error.message,
-    });
+    sendError(res, 'Erreur lors de la récupération des clients', 500);
   }
 };
 
@@ -114,10 +104,7 @@ export const getClientById = async (req, res) => {
     });
 
     if (!coachProfile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Profil coach non trouvé',
-      });
+      return sendError(res, 'Profil coach non trouvé', 404);
     }
 
     // Essayer de récupérer le client via ClientCoach
@@ -145,14 +132,11 @@ export const getClientById = async (req, res) => {
 
     if (clientCoachRelation) {
       // Client accepté trouvé
-      return res.json({
-        success: true,
-        data: {
-          ...clientCoachRelation.client,
-          requestStatus: 'accepted',
-          isPrimaryCoach: clientCoachRelation.isPrimary,
-          relationStartDate: clientCoachRelation.startDate,
-        },
+      return sendSuccess(res, {
+        ...clientCoachRelation.client,
+        requestStatus: 'accepted',
+        isPrimaryCoach: clientCoachRelation.isPrimary,
+        relationStartDate: clientCoachRelation.startDate,
       });
     }
 
@@ -181,30 +165,20 @@ export const getClientById = async (req, res) => {
 
     if (request) {
       // Demande en attente trouvée
-      return res.json({
-        success: true,
-        data: {
-          ...request.client,
-          requestId: request.id,
-          requestStatus: 'pending',
-          requestMessage: request.message,
-          requestDate: request.createdAt,
-        },
+      return sendSuccess(res, {
+        ...request.client,
+        requestId: request.id,
+        requestStatus: 'pending',
+        requestMessage: request.message,
+        requestDate: request.createdAt,
       });
     }
 
     // Ni client accepté ni demande en attente
-    return res.status(404).json({
-      success: false,
-      message: 'Client non trouvé',
-    });
+    return sendError(res, 'Client non trouvé', 404);
   } catch (error) {
     console.error('Error fetching client:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur lors de la récupération du client',
-      error: error.message,
-    });
+    sendError(res, 'Erreur lors de la récupération du client', 500);
   }
 };
 
