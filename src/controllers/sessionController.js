@@ -265,11 +265,14 @@ export const deleteSession = async (req, res) => {
 export const validateSession = async (req, res) => {
   try {
     const { id } = req.params;
+    const { durationSeconds } = req.body;
 
     const session = await prisma.session.update({
       where: { id },
       data: {
         status: 'DONE',
+        completedByClient: true,
+        ...(durationSeconds != null && { durationSeconds: parseInt(durationSeconds) }),
       },
       include: {
         exercises: {

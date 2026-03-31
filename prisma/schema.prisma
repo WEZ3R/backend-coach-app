@@ -255,12 +255,14 @@ model Session {
   id          String        @id @default(uuid())
   programId   String
   program     Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
-  date        DateTime
-  status      SessionStatus @default(EMPTY)
-  isRestDay   Boolean       @default(false)
-  notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  date               DateTime
+  status             SessionStatus @default(EMPTY)
+  isRestDay          Boolean       @default(false)
+  notes              String?
+  completedByClient  Boolean       @default(false)
+  durationSeconds    Int?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   // Relations
   exercises Exercise[]
