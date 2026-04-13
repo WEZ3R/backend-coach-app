@@ -297,7 +297,7 @@ describe('getCompletionAndStreak', () => {
       assert.ok(typeof entry.completed === 'number', 'completed est un nombre');
       assert.ok(typeof entry.total === 'number', 'total est un nombre');
       assert.ok(typeof entry.rate === 'number', 'rate entre 0 et 1');
-      assert.ok(entry.rate >= 0 && entry.rate <= 1, 'rate entre 0 et 1');
+      assert.ok(entry.rate >= 0 && entry.rate <= 100, 'rate entre 0 et 100');
     }
   });
 

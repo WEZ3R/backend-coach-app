@@ -86,6 +86,7 @@ export const upsertSession = async (req, res) => {
               gifUrl: ex.gifUrl || null,
               description: ex.description || null,
               exerciseRefId: ex.exerciseRefId || null,
+              supersetGroup: ex.supersetGroup || null,
               order: index,
             })),
           });
@@ -114,6 +115,7 @@ export const upsertSession = async (req, res) => {
                   gifUrl: ex.gifUrl || null,
                   description: ex.description || null,
                   exerciseRefId: ex.exerciseRefId || null,
+                  supersetGroup: ex.supersetGroup || null,
                   order: index,
                 })),
               }

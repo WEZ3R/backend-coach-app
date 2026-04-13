@@ -6,7 +6,7 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
  */
 export const toggleSetCompletion = async (req, res) => {
   try {
-    const { exerciseId, setNumber, repsAchieved, weightUsed } = req.body;
+    const { exerciseId, setNumber, repsAchieved, weightUsed, rpe } = req.body;
 
     // Check if completion already exists
     const existing = await prisma.setCompletion.findUnique({
@@ -37,6 +37,7 @@ export const toggleSetCompletion = async (req, res) => {
           setNumber,
           repsAchieved,
           weightUsed,
+          ...(rpe != null ? { rpe: parseFloat(rpe) } : {}),
           completed: true,
         },
       });
@@ -53,7 +54,8 @@ export const toggleSetCompletion = async (req, res) => {
  */
 export const updateSetCompletion = async (req, res) => {
   try {
-    const { exerciseId, setNumber, repsAchieved, weightUsed } = req.body;
+    const { exerciseId, setNumber, repsAchieved, weightUsed, rpe } = req.body;
+    const rpeParsed = rpe != null ? parseFloat(rpe) : undefined;
 
     const completion = await prisma.setCompletion.upsert({
       where: {
@@ -65,12 +67,14 @@ export const updateSetCompletion = async (req, res) => {
       update: {
         repsAchieved,
         weightUsed,
+        ...(rpeParsed != null ? { rpe: rpeParsed } : {}),
       },
       create: {
         exerciseId,
         setNumber,
         repsAchieved,
         weightUsed,
+        ...(rpeParsed != null ? { rpe: rpeParsed } : {}),
         completed: true,
       },
     });
