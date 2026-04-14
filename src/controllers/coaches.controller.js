@@ -14,7 +14,7 @@ export const getAllCoaches = async (req, res) => {
       whereFilter.city = { contains: city, mode: 'insensitive' };
     }
     if (gym) {
-      whereFilter.trainingLocations = { has: gym };
+      whereFilter.gyms = { some: { gym: { name: { contains: gym, mode: 'insensitive' } } } };
     }
 
     const coaches = await prisma.coachProfile.findMany({
@@ -156,7 +156,7 @@ export const getMyProfile = async (req, res) => {
 export const updateMyProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { bio, city, isRemote, trainingLocations } = req.body;
+    const { bio, city, isRemote } = req.body;
 
     // Récupérer le profil coach
     const coachProfile = await prisma.coachProfile.findUnique({
@@ -173,16 +173,6 @@ export const updateMyProfile = async (req, res) => {
       profilePicture = `/uploads/${req.file.filename}`;
     }
 
-    // Parser trainingLocations si c'est une chaîne JSON
-    let parsedLocations = trainingLocations;
-    if (typeof trainingLocations === 'string') {
-      try {
-        parsedLocations = JSON.parse(trainingLocations);
-      } catch (e) {
-        parsedLocations = [];
-      }
-    }
-
     // Convertir isRemote en booléen si c'est une chaîne
     let parsedIsRemote = coachProfile.isRemote;
     if (isRemote !== undefined) {
@@ -196,7 +186,6 @@ export const updateMyProfile = async (req, res) => {
         bio,
         city,
         isRemote: parsedIsRemote,
-        trainingLocations: parsedLocations || [],
         profilePicture,
       },
       include: {
@@ -214,5 +203,131 @@ export const updateMyProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     sendError(res, 'Erreur lors de la mise à jour du profil', 500);
+  }
+};
+
+/**
+ * Soumettre l'onboarding coach (wizard 2 étapes)
+ * PUT /api/coaches/onboarding
+ */
+export const submitCoachOnboarding = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { bio, specialties = [], city, latitude, longitude, gymIds = [], isRemote } = req.body;
+
+    const coachProfile = await prisma.coachProfile.findUnique({ where: { userId } });
+    if (!coachProfile) return sendError(res, 'Profil coach non trouvé', 404);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.coachProfile.update({
+        where: { userId },
+        data: {
+          bio: bio || null,
+          specialties: specialties,
+          city: city || null,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          isRemote: isRemote === true || isRemote === 'true',
+          onboardingCompletedAt: new Date(),
+        },
+      });
+
+      if (gymIds.length > 0) {
+        await tx.coachGym.deleteMany({ where: { coachId: coachProfile.id } });
+        await tx.coachGym.createMany({
+          data: gymIds.map((gymId) => ({ coachId: coachProfile.id, gymId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    const updated = await prisma.coachProfile.findUnique({
+      where: { userId },
+      include: { gyms: { include: { gym: true } } },
+    });
+
+    sendSuccess(res, updated, 'Onboarding coach complété');
+  } catch (error) {
+    console.error('Coach onboarding error:', error);
+    sendError(res, "Erreur lors de l'onboarding", 500);
+  }
+};
+
+// Mapping GoalCategory → spécialités compatibles
+const GOAL_SPECIALTY_MAP = {
+  WEIGHT_LOSS: ['WEIGHT_LOSS', 'FITNESS', 'ENDURANCE', 'CROSSFIT'],
+  MUSCLE_GAIN: ['HYPERTROPHY', 'BODYBUILDING', 'STRENGTH', 'POWERLIFTING'],
+  FITNESS: ['FITNESS', 'CROSSFIT', 'ENDURANCE', 'YOGA', 'MOBILITY'],
+  REHAB: ['REHAB', 'MOBILITY', 'YOGA'],
+  PERFORMANCE: ['PERFORMANCE', 'STRENGTH', 'POWERLIFTING', 'ENDURANCE', 'CROSSFIT'],
+  ENDURANCE: ['ENDURANCE', 'FITNESS', 'CROSSFIT'],
+};
+
+/**
+ * Coachs recommandés pour le client connecté
+ * GET /api/coaches/recommended
+ */
+export const getRecommendedCoaches = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { userId },
+      include: { gyms: { select: { gymId: true } } },
+    });
+    if (!clientProfile) return sendError(res, 'Profil client non trouvé', 404);
+
+    const clientGymIds = clientProfile.gyms.map((g) => g.gymId);
+    const compatibleSpecialties = clientProfile.goalCategory
+      ? GOAL_SPECIALTY_MAP[clientProfile.goalCategory] || []
+      : [];
+
+    const coaches = await prisma.coachProfile.findMany({
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: false } },
+        gyms: { select: { gymId: true } },
+        reviews: { select: { rating: true } },
+      },
+    });
+
+    const scored = coaches.map((coach) => {
+      let score = 0;
+
+      // Matching spécialité ↔ objectif (+3)
+      const hasMatchingSpecialty = coach.specialties.some((s) =>
+        compatibleSpecialties.includes(s)
+      );
+      if (hasMatchingSpecialty) score += 3;
+
+      // Même ville (+2)
+      if (clientProfile.city && coach.city) {
+        if (coach.city.toLowerCase() === clientProfile.city.toLowerCase()) score += 2;
+      }
+
+      // Salles en commun (+2 par salle)
+      const coachGymIds = coach.gyms.map((g) => g.gymId);
+      const commonGyms = clientGymIds.filter((id) => coachGymIds.includes(id));
+      score += commonGyms.length * 2;
+
+      // Coaching à distance (+1 si client sans ville)
+      if (!clientProfile.city && coach.isRemote) score += 1;
+
+      return {
+        ...coach,
+        score,
+        matchDetails: {
+          specialtyMatch: hasMatchingSpecialty,
+          cityMatch: coach.city?.toLowerCase() === clientProfile.city?.toLowerCase(),
+          commonGyms: commonGyms.length,
+        },
+      };
+    });
+
+    // Trier par score décroissant, retourner top 10
+    scored.sort((a, b) => b.score - a.score);
+    sendSuccess(res, scored.slice(0, 10));
+  } catch (error) {
+    console.error('Recommended coaches error:', error);
+    sendError(res, 'Erreur lors de la récupération des coachs recommandés', 500);
   }
 };

@@ -121,6 +121,63 @@ export const markAsRead = async (req, res) => {
 };
 
 /**
+ * Récupérer tous les partenaires de conversation de l'utilisateur connecté.
+ * Pour un CLIENT : retourne les CoachProfiles ayant échangé au moins un message.
+ * Pour un COACH  : retourne les ClientProfiles ayant échangé au moins un message.
+ */
+export const getConversationPartners = async (req, res) => {
+  try {
+    const { id: userId, role } = req.user;
+
+    if (role === 'COACH') {
+      const coachProfile = await prisma.coachProfile.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (!coachProfile) return sendSuccess(res, []);
+
+      // Distinct clientIds dans les messages de ce coach
+      const rows = await prisma.message.findMany({
+        where: { coachId: coachProfile.id },
+        select: { clientId: true },
+        distinct: ['clientId'],
+      });
+      const clientIds = rows.map((r) => r.clientId);
+
+      const clients = await prisma.clientProfile.findMany({
+        where: { id: { in: clientIds } },
+        include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      });
+      return sendSuccess(res, clients);
+    }
+
+    // CLIENT
+    const clientProfile = await prisma.clientProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!clientProfile) return sendSuccess(res, []);
+
+    // Distinct coachIds dans les messages de ce client
+    const rows = await prisma.message.findMany({
+      where: { clientId: clientProfile.id },
+      select: { coachId: true },
+      distinct: ['coachId'],
+    });
+    const coachIds = rows.map((r) => r.coachId);
+
+    const coaches = await prisma.coachProfile.findMany({
+      where: { id: { in: coachIds } },
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+    });
+    return sendSuccess(res, coaches);
+  } catch (error) {
+    console.error('Get conversation partners error:', error);
+    sendError(res, 'Failed to get conversation partners', 500);
+  }
+};
+
+/**
  * Récupérer le nombre de messages non lus par conversation
  * Retourne un objet { [interlocuteurProfileId]: count }
  */

@@ -8,7 +8,7 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
  */
 export const register = async (req, res) => {
   try {
-    const { email, password, role, firstName, lastName, weight, height, dateOfBirth } = req.body;
+    const { email, password, role, firstName, lastName, phone } = req.body;
 
     // Validation des champs requis
     if (!email || !password || !role || !firstName || !lastName) {
@@ -51,6 +51,7 @@ export const register = async (req, res) => {
         role,
         firstName,
         lastName,
+        phone: phone || null,
       },
       select: {
         id: true,
@@ -58,26 +59,15 @@ export const register = async (req, res) => {
         role: true,
         firstName: true,
         lastName: true,
+        phone: true,
       },
     });
 
-    // Créer le profil correspondant au rôle
+    // Créer le profil vide correspondant au rôle
     if (role === 'COACH') {
-      await prisma.coachProfile.create({
-        data: {
-          userId: user.id,
-        },
-      });
+      await prisma.coachProfile.create({ data: { userId: user.id } });
     } else if (role === 'CLIENT') {
-      // Créer le profil client avec les informations optionnelles
-      await prisma.clientProfile.create({
-        data: {
-          userId: user.id,
-          weight: weight ? parseFloat(weight) : null,
-          height: height ? parseFloat(height) : null,
-          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-        },
-      });
+      await prisma.clientProfile.create({ data: { userId: user.id } });
     }
 
     // Générer un token
@@ -88,6 +78,7 @@ export const register = async (req, res) => {
       {
         user,
         token,
+        onboardingComplete: false,
       },
       'Inscription réussie',
       201
@@ -160,9 +151,16 @@ export const getMe = async (req, res) => {
         role: true,
         firstName: true,
         lastName: true,
-        coachProfile: true,
+        phone: true,
+        coachProfile: {
+          include: {
+            gyms: { include: { gym: true } },
+          },
+        },
         clientProfile: {
           include: {
+            gyms: { include: { gym: true } },
+            trainingSpots: true,
             coach: {
               include: {
                 user: {

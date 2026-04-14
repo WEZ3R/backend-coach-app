@@ -17,6 +17,43 @@ enum UserRole {
   CLIENT
 }
 
+enum ClientLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum GoalCategory {
+  WEIGHT_LOSS
+  MUSCLE_GAIN
+  FITNESS
+  REHAB
+  PERFORMANCE
+  ENDURANCE
+}
+
+enum CoachSpecialty {
+  STRENGTH
+  HYPERTROPHY
+  WEIGHT_LOSS
+  REHAB
+  ENDURANCE
+  CROSSFIT
+  YOGA
+  MOBILITY
+  POWERLIFTING
+  BODYBUILDING
+}
+
+enum TrainingSpotType {
+  PARK
+  TRACK
+  HOME
+  OUTDOOR
+  POOL
+  OTHER
+}
+
 enum SessionStatus {
   EMPTY
   DRAFT
@@ -83,13 +120,17 @@ model CoachProfile {
   profilePicture String?  // URL de la photo de profil
   city           String?  // Ville du coach
   isRemote       Boolean  @default(false) // Coaching à distance
-  trainingLocations String[] // Lieux d'entraînement (array)
+  specialties    CoachSpecialty[]      // Spécialités du coach
+  latitude       Float?   // Géolocalisation
+  longitude      Float?
+  onboardingCompletedAt DateTime?       // Null = onboarding non finalisé
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
   clients          ClientProfile[]     @relation("ClientCoach") // Ancien champ pour rétrocompatibilité
   clientCoaches    ClientCoach[]       // Nouvelle relation many-to-many
+  gyms             CoachGym[]          // Salles d'entraînement
   programs         Program[]
   programTemplates ProgramTemplate[]
   sentMessages     Message[]           @relation("CoachMessages")
@@ -115,16 +156,21 @@ model ClientProfile {
   height         Float?    // Taille en cm
   dateOfBirth    DateTime? // Date de naissance pour calculer l'âge
   gender         String?   // Genre: M, F, ou X
-  goals          String?   // Objectifs du client
-  level          String?   // Niveau: débutant, intermédiaire, avancé
+  goalCategory   GoalCategory? // Catégorie d'objectif structurée
+  customGoal     String?       // Objectif libre (complémentaire ou seul)
+  level          ClientLevel?  // Niveau sportif
   profilePicture String?   // URL de la photo de profil
-  city              String?   // Ville du client
-  trainingLocations String[] // Lieux d'entraînement (array)
+  city           String?   // Ville du client
+  latitude       Float?    // Géolocalisation
+  longitude      Float?
+  onboardingCompletedAt DateTime? // Null = onboarding non finalisé
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   // Relations
   coaches          ClientCoach[]   // Nouvelle relation many-to-many
+  gyms             ClientGym[]     // Salles d'entraînement fréquentées
+  trainingSpots    TrainingSpot[]  // Lieux custom (parcs, pistes, etc.)
   stats            DailyStat[]
   meals            Meal[]
   receivedMessages Message[]       @relation("ClientMessages")
@@ -153,6 +199,64 @@ model ClientCoach {
 
   @@unique([clientId, coachId])
   @@map("client_coaches")
+}
+
+// Salle de sport (source OpenStreetMap/Overpass)
+model Gym {
+  id         String   @id @default(uuid())
+  osmId      String?  @unique // ID Overpass pour déduplication (ex: "node/123456")
+  name       String
+  brand      String?  // "Basic-Fit", "Fitness Park"…
+  address    String?
+  city       String
+  postalCode String?
+  country    String   @default("FR")
+  latitude   Float
+  longitude  Float
+  createdAt  DateTime @default(now())
+
+  clients ClientGym[]
+  coaches CoachGym[]
+
+  @@index([city])
+  @@map("gyms")
+}
+
+// Table pivot Client ↔ Gym
+model ClientGym {
+  clientId String
+  gymId    String
+  client   ClientProfile @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  gym      Gym           @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, gymId])
+  @@map("client_gyms")
+}
+
+// Table pivot Coach ↔ Gym
+model CoachGym {
+  coachId String
+  gymId   String
+  coach   CoachProfile @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  gym     Gym          @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@id([coachId, gymId])
+  @@map("coach_gyms")
+}
+
+// Lieux d'entraînement custom du client (parc, piste, adresse précise)
+model TrainingSpot {
+  id        String           @id @default(uuid())
+  clientId  String
+  client    ClientProfile    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type      TrainingSpotType
+  label     String
+  address   String?
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime         @default(now())
+
+  @@map("training_spots")
 }
 
 // Programme d'entraînement

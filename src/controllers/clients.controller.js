@@ -253,7 +253,7 @@ export const getMyClientProfile = async (req, res) => {
 export const updateMyClientProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { goals, level, weight, height, gender, city, trainingLocations } = req.body;
+    const { goalCategory, customGoal, level, weight, height, gender, city } = req.body;
 
     // Récupérer le profil client
     const clientProfile = await prisma.clientProfile.findUnique({
@@ -270,30 +270,17 @@ export const updateMyClientProfile = async (req, res) => {
       profilePicture = `/uploads/${req.file.filename}`;
     }
 
-    // Parser trainingLocations depuis JSON string si nécessaire
-    let parsedTrainingLocations = clientProfile.trainingLocations;
-    if (trainingLocations !== undefined) {
-      try {
-        parsedTrainingLocations =
-          typeof trainingLocations === 'string'
-            ? JSON.parse(trainingLocations)
-            : trainingLocations;
-      } catch {
-        parsedTrainingLocations = clientProfile.trainingLocations;
-      }
-    }
-
     // Mettre à jour le profil
     const updatedProfile = await prisma.clientProfile.update({
       where: { userId },
       data: {
-        goals,
-        level,
+        goalCategory: goalCategory !== undefined ? goalCategory : clientProfile.goalCategory,
+        customGoal: customGoal !== undefined ? customGoal : clientProfile.customGoal,
+        level: level !== undefined ? level : clientProfile.level,
         weight: weight ? parseFloat(weight) : clientProfile.weight,
         height: height ? parseFloat(height) : clientProfile.height,
-        gender,
+        gender: gender !== undefined ? gender : clientProfile.gender,
         city: city !== undefined ? city : clientProfile.city,
-        trainingLocations: parsedTrainingLocations,
         profilePicture,
       },
       include: {
@@ -333,9 +320,8 @@ export const getProspectiveClients = async (req, res) => {
     }
 
     const hasCity = !!coachProfile.city;
-    const hasLocations = coachProfile.trainingLocations && coachProfile.trainingLocations.length > 0;
 
-    if (!hasCity && !hasLocations) {
+    if (!hasCity) {
       return sendSuccess(res, []);
     }
 
@@ -356,13 +342,17 @@ export const getProspectiveClients = async (req, res) => {
       ...pendingRequests.map((r) => r.clientId),
     ];
 
+    // Récupérer les gym IDs du coach
+    const coachGyms = await prisma.coachGym.findMany({
+      where: { coachId: coachProfile.id },
+      select: { gymId: true },
+    });
+    const coachGymIds = coachGyms.map((g) => g.gymId);
+
     // Construire les conditions de matching géographique
-    const whereConditions = [];
-    if (hasCity) {
-      whereConditions.push({ city: coachProfile.city });
-    }
-    if (hasLocations) {
-      whereConditions.push({ trainingLocations: { hasSome: coachProfile.trainingLocations } });
+    const whereConditions = [{ city: coachProfile.city }];
+    if (coachGymIds.length > 0) {
+      whereConditions.push({ gyms: { some: { gymId: { in: coachGymIds } } } });
     }
 
     const prospectiveClients = await prisma.clientProfile.findMany({
@@ -379,26 +369,26 @@ export const getProspectiveClients = async (req, res) => {
             email: true,
           },
         },
+        gyms: { include: { gym: true } },
       },
     });
 
     // Calculer le score de matching
     const scoredClients = prospectiveClients.map((client) => {
       let score = 0;
-      const cityMatch = !!(hasCity && client.city && coachProfile.city === client.city);
+      const cityMatch = !!(client.city && coachProfile.city === client.city);
       if (cityMatch) score += 2;
 
-      const commonLocations = (client.trainingLocations || []).filter((loc) =>
-        coachProfile.trainingLocations.includes(loc)
-      );
-      score += commonLocations.length;
+      const clientGymIds = client.gyms.map((g) => g.gymId);
+      const commonGymIds = clientGymIds.filter((id) => coachGymIds.includes(id));
+      score += commonGymIds.length * 2;
 
       return {
         ...client,
         score,
         matchDetails: {
           cityMatch,
-          commonLocations,
+          commonGyms: commonGymIds.length,
         },
       };
     });
@@ -410,5 +400,84 @@ export const getProspectiveClients = async (req, res) => {
   } catch (error) {
     console.error('Get prospective clients error:', error);
     sendError(res, 'Erreur lors de la récupération des clients potentiels', 500);
+  }
+};
+
+/**
+ * Soumettre l'onboarding client (wizard 3 étapes)
+ * PUT /api/clients/onboarding
+ * Body: { step1: { gender?, age, height, weight }, step2: { city, gymIds[], customSpots[] }, step3: { goalCategory?, customGoal?, level } }
+ */
+export const submitClientOnboarding = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { step1 = {}, step2 = {}, step3 = {} } = req.body;
+
+    const clientProfile = await prisma.clientProfile.findUnique({ where: { userId } });
+    if (!clientProfile) return sendError(res, 'Profil client non trouvé', 404);
+
+    // dateOfBirth : accepte ISO string (nouveau) ou calcul depuis age (rétrocompat)
+    let dateOfBirth = clientProfile.dateOfBirth;
+    if (step1.dateOfBirth) {
+      dateOfBirth = new Date(step1.dateOfBirth);
+    } else if (step1.age) {
+      const year = new Date().getFullYear() - parseInt(step1.age, 10);
+      dateOfBirth = new Date(`${year}-01-01`);
+    }
+
+    // Transaction atomique
+    await prisma.$transaction(async (tx) => {
+      // 1. Mettre à jour ClientProfile
+      await tx.clientProfile.update({
+        where: { userId },
+        data: {
+          gender: step1.gender || null,
+          dateOfBirth,
+          height: step1.height ? parseFloat(step1.height) : null,
+          weight: step1.weight ? parseFloat(step1.weight) : null,
+          city: step2.city || null,
+          goalCategory: step3.goalCategory || null,
+          customGoal: step3.customGoal || null,
+          level: step3.level || null,
+          onboardingCompletedAt: new Date(),
+        },
+      });
+
+      // 2. Gyms — supprimer ancien puis recréer
+      if (step2.gymIds && step2.gymIds.length > 0) {
+        await tx.clientGym.deleteMany({ where: { clientId: clientProfile.id } });
+        await tx.clientGym.createMany({
+          data: step2.gymIds.map((gymId) => ({ clientId: clientProfile.id, gymId })),
+          skipDuplicates: true,
+        });
+      }
+
+      // 3. Lieux custom — supprimer anciens puis recréer
+      if (step2.customSpots) {
+        await tx.trainingSpot.deleteMany({ where: { clientId: clientProfile.id } });
+        if (step2.customSpots.length > 0) {
+          await tx.trainingSpot.createMany({
+            data: step2.customSpots.map((spot) => ({
+              clientId: clientProfile.id,
+              type: spot.type || 'OTHER',
+              label: spot.label,
+              address: spot.address || null,
+              latitude: spot.lat ? parseFloat(spot.lat) : null,
+              longitude: spot.lng ? parseFloat(spot.lng) : null,
+            })),
+          });
+        }
+      }
+    });
+
+    const updated = await prisma.clientProfile.findUnique({
+      where: { userId },
+      include: { gyms: { include: { gym: true } }, trainingSpots: true },
+    });
+
+    sendSuccess(res, updated, 'Onboarding complété');
+  } catch (error) {
+    console.error('Client onboarding error:', error);
+    sendError(res, "Erreur lors de l'onboarding", 500);
   }
 };

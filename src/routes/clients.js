@@ -7,6 +7,7 @@ import {
   getMyClientProfile,
   updateMyClientProfile,
   getProspectiveClients,
+  submitClientOnboarding,
 } from '../controllers/clients.controller.js';
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.use(authenticate);
 // Routes pour les clients (leur propre profil)
 router.get('/me', authorize('CLIENT'), getMyClientProfile);
 router.put('/me', authorize('CLIENT'), upload.single('profilePicture'), updateMyClientProfile);
+router.put('/onboarding', authorize('CLIENT'), submitClientOnboarding);
 
 // Routes pour les coaches
 router.get('/coach', authorize('COACH'), getCoachClients);
