@@ -172,6 +172,10 @@ export const getMe = async (req, res) => {
                 },
               },
             },
+            coaches: {
+              where: { isActive: true },
+              select: { id: true },
+            },
           },
         },
       },

@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { computeNutrition } from './nutrition.controller.js';
 
 /**
  * Créer un template à partir d'un programme existant ou nouveau
@@ -19,6 +20,10 @@ export const createTemplate = async (req, res) => {
       weightTrackingEnabled,
       sessionsData,
       customGoalsData,
+      nutritionObjective,
+      nutritionActivityFactor,
+      nutritionSurplus,
+      nutritionDeficit,
       programId, // Optionnel : ID du programme source
     } = req.body;
     const coachId = req.user.id;
@@ -47,6 +52,10 @@ export const createTemplate = async (req, res) => {
       weightTrackingEnabled: weightTrackingEnabled || false,
       sessionsData: sessionsData || null,
       customGoalsData: customGoalsData || null,
+      nutritionObjective: nutritionObjective || null,
+      nutritionActivityFactor: nutritionActivityFactor ? parseFloat(nutritionActivityFactor) : null,
+      nutritionSurplus: nutritionSurplus ? parseInt(nutritionSurplus) : null,
+      nutritionDeficit: nutritionDeficit ? parseInt(nutritionDeficit) : null,
     };
 
     if (programId) {
@@ -218,6 +227,43 @@ export const applyTemplate = async (req, res) => {
 
     const programStartDate = new Date(startDate);
 
+    // Calcul automatique des calories si le template a des paramètres nutritionnels
+    let resolvedTargetCalories = template.targetCalories;
+
+    if (
+      template.dietEnabled &&
+      template.dietType === 'calories' &&
+      template.nutritionObjective &&
+      template.nutritionActivityFactor
+    ) {
+      const clientProfile = await prisma.clientProfile.findUnique({
+        where: { id: clientId },
+        select: { weight: true, height: true, dateOfBirth: true, gender: true },
+      });
+
+      if (clientProfile?.weight && clientProfile?.height && clientProfile?.dateOfBirth && clientProfile?.gender) {
+        const today = new Date();
+        const dob = new Date(clientProfile.dateOfBirth);
+        let age = today.getFullYear() - dob.getFullYear();
+        if (
+          today.getMonth() < dob.getMonth() ||
+          (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+        ) age--;
+
+        const calc = computeNutrition({
+          gender:         clientProfile.gender,
+          weight:         clientProfile.weight,
+          height:         clientProfile.height,
+          age,
+          activityFactor: template.nutritionActivityFactor,
+          objective:      template.nutritionObjective,
+          surplus:        template.nutritionSurplus ?? undefined,
+          deficit:        template.nutritionDeficit ?? undefined,
+        });
+        resolvedTargetCalories = calc.calories_cible;
+      }
+    }
+
     // Créer le programme avec les custom goals
     const program = await prisma.program.create({
       data: {
@@ -230,7 +276,7 @@ export const applyTemplate = async (req, res) => {
         endDate: endDate ? new Date(endDate) : null,
         dietEnabled: template.dietEnabled,
         dietType: template.dietType,
-        targetCalories: template.targetCalories,
+        targetCalories: resolvedTargetCalories,
         waterTrackingEnabled: template.waterTrackingEnabled,
         waterGoal: template.waterGoal,
         sleepTrackingEnabled: template.sleepTrackingEnabled,
@@ -305,18 +351,46 @@ export const applyTemplate = async (req, res) => {
 };
 
 /**
- * Mettre à jour un template
+ * Mettre à jour un template (tous les champs)
  */
 export const updateTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const {
+      name, description, cycleDays,
+      dietEnabled, dietType, targetCalories,
+      waterTrackingEnabled, waterGoal,
+      sleepTrackingEnabled, weightTrackingEnabled,
+      sessionsData, customGoalsData,
+      nutritionObjective, nutritionActivityFactor, nutritionSurplus, nutritionDeficit,
+    } = req.body;
+
+    const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: req.user.id } });
+    if (!coachProfile) return sendError(res, 'Coach profile not found', 404);
+
+    const existing = await prisma.programTemplate.findUnique({ where: { id } });
+    if (!existing) return sendError(res, 'Template not found', 404);
+    if (existing.coachId !== coachProfile.id) return sendError(res, 'Unauthorized', 403);
 
     const template = await prisma.programTemplate.update({
       where: { id },
       data: {
         name,
-        description,
+        description: description ?? null,
+        cycleDays: cycleDays !== undefined ? (cycleDays ? parseInt(cycleDays) : null) : undefined,
+        dietEnabled: dietEnabled ?? undefined,
+        dietType: dietType ?? null,
+        targetCalories: targetCalories !== undefined ? (targetCalories ? parseInt(targetCalories) : null) : undefined,
+        waterTrackingEnabled: waterTrackingEnabled ?? undefined,
+        waterGoal: waterGoal !== undefined ? (waterGoal ? parseFloat(waterGoal) : null) : undefined,
+        sleepTrackingEnabled: sleepTrackingEnabled ?? undefined,
+        weightTrackingEnabled: weightTrackingEnabled ?? undefined,
+        sessionsData: sessionsData !== undefined ? sessionsData : undefined,
+        customGoalsData: customGoalsData !== undefined ? customGoalsData : undefined,
+        nutritionObjective: nutritionObjective !== undefined ? (nutritionObjective || null) : undefined,
+        nutritionActivityFactor: nutritionActivityFactor !== undefined ? (nutritionActivityFactor ? parseFloat(nutritionActivityFactor) : null) : undefined,
+        nutritionSurplus: nutritionSurplus !== undefined ? (nutritionSurplus ? parseInt(nutritionSurplus) : null) : undefined,
+        nutritionDeficit: nutritionDeficit !== undefined ? (nutritionDeficit ? parseInt(nutritionDeficit) : null) : undefined,
       },
     });
 

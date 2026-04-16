@@ -24,6 +24,9 @@ import exerciseRefRoutes from './routes/exerciseRefs.js';
 import appointmentRoutes from './routes/appointments.js';
 import availabilityRoutes from './routes/availability.js';
 import gymRoutes from './routes/gyms.js';
+import notificationRoutes from './routes/notifications.js';
+import sessionTemplateRoutes from './routes/sessionTemplates.js';
+import nutritionRoutes from './routes/nutrition.js';
 import './jobs/appointmentReminders.js';
 
 const app = express();
@@ -61,6 +64,9 @@ app.use('/api/exercise-refs', exerciseRefRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/gyms', gymRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/session-templates', sessionTemplateRoutes);
+app.use('/api/nutrition', nutritionRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {

@@ -24,7 +24,11 @@ const checkConflict = async (coachId, clientId, startAt, endAt, excludeId = null
 // POST /api/appointments — COACH ou CLIENT
 export const createAppointment = async (req, res) => {
   try {
-    const { title, clientId, coachId, startAt, durationMinutes, locationType, locationDetail, meetingType, rrule } = req.body;
+    const {
+      title, clientId, coachId, startAt,
+      durationMinutes: durationParam, locationType, locationDetail, meetingType, rrule,
+      resolution, conflictId,  // gestion des conflits
+    } = req.body;
 
     const isCoach = req.user.role === 'COACH';
 
@@ -32,13 +36,11 @@ export const createAppointment = async (req, res) => {
     let resolvedClientId = clientId;
 
     if (isCoach) {
-      // Récupérer le profil coach
       coachProfile = await prisma.coachProfile.findUnique({
         where: { userId: req.user.id },
       });
       if (!coachProfile) return sendError(res, 'Profil coach introuvable', 404);
     } else {
-      // CLIENT : doit fournir coachId, ne peut pas utiliser rrule
       if (rrule) return sendError(res, 'Les clients ne peuvent pas créer de RDV récurrents', 403);
       if (!coachId) return sendError(res, 'Le coachId est requis', 400);
 
@@ -53,7 +55,6 @@ export const createAppointment = async (req, res) => {
       });
       if (!coachProfile) return sendError(res, 'Coach introuvable', 404);
 
-      // Vérifier si le client est bloqué par ce coach
       const block = await prisma.coachClientBlock.findUnique({
         where: { coachId_clientId: { coachId, clientId: clientProfile.id } },
       });
@@ -64,23 +65,63 @@ export const createAppointment = async (req, res) => {
       resolvedClientId = clientProfile.id;
     }
 
-    // Validation des champs requis
     if (!title) return sendError(res, 'Le titre est requis', 400);
     if (!startAt) return sendError(res, 'La date de début est requise', 400);
-    if (!durationMinutes) return sendError(res, 'La durée est requise', 400);
+    if (!durationParam) return sendError(res, 'La durée est requise', 400);
     if (!locationType) return sendError(res, 'Le type de lieu est requis', 400);
 
     const startDate = new Date(startAt);
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+    let durationMinutes = durationParam;
+    let endDate = new Date(startDate.getTime() + durationMinutes * 60000);
 
-    // Statut : toujours PROPOSED si client présent, CONFIRMED sinon (coach sans client)
     const status = resolvedClientId ? 'PROPOSED' : 'CONFIRMED';
     const isSentByCoach = isCoach;
 
-    // Vérification de conflit (uniquement si CONFIRMED)
-    if (!resolvedClientId) {
-      const conflict = await checkConflict(coachProfile.id, null, startDate, endDate);
-      if (conflict) return sendError(res, 'Conflit de planning : un RDV existe déjà sur ce créneau', 409);
+    // Vérification de conflit coach — toujours active (un slot bloqué empêche les propositions)
+    const conflict = await checkConflict(coachProfile.id, null, startDate, endDate);
+
+    if (conflict && !resolution) {
+      // Retourner les détails du conflit pour que le frontend propose des options
+      return res.status(409).json({
+        success: false,
+        message: 'Conflit de planning détecté sur ce créneau.',
+        conflict: {
+          id: conflict.id,
+          title: conflict.title,
+          startAt: conflict.startAt,
+          endAt: conflict.endAt,
+          durationMinutes: conflict.durationMinutes,
+        },
+      });
+    }
+
+    if (conflict && resolution) {
+      // Récupérer le RDV en conflit (utiliser conflictId si fourni, sinon celui détecté)
+      const targetId = conflictId || conflict.id;
+      const target = await prisma.appointment.findUnique({ where: { id: targetId } });
+      if (!target) return sendError(res, 'RDV en conflit introuvable', 404);
+
+      if (resolution === 'replace') {
+        // Supprimer les enfants de série si applicable, puis le RDV lui-même
+        if (target.rrule) {
+          await prisma.appointment.deleteMany({ where: { parentId: target.id } });
+        }
+        await prisma.appointment.delete({ where: { id: target.id } });
+
+      } else if (resolution === 'shorten') {
+        if (target.startAt < startDate) {
+          // L'existant démarre avant le nouveau → raccourcir l'existant
+          const newDur = Math.max(1, Math.round((startDate.getTime() - target.startAt.getTime()) / 60000));
+          await prisma.appointment.update({
+            where: { id: target.id },
+            data: { endAt: startDate, durationMinutes: newDur },
+          });
+        } else {
+          // Le nouveau démarre avant l'existant → raccourcir le nouveau
+          endDate = new Date(target.startAt.getTime());
+          durationMinutes = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+        }
+      }
     }
 
     if (rrule) {
@@ -386,7 +427,7 @@ export const cancelAppointment = async (req, res) => {
       });
     }
 
-    // Si annulation par le client et RDV avait un clientId → créer un message TIP pour le coach
+    // Si annulation par le client → message TIP pour le coach
     if (isClient && appointment.clientId) {
       const dateStr = appointment.startAt.toLocaleDateString('fr-FR');
       const clientUser = await prisma.user.findUnique({ where: { id: req.user.id } });
@@ -403,10 +444,105 @@ export const cancelAppointment = async (req, res) => {
       });
     }
 
+    // Si annulation par le coach d'un RDV CONFIRMED avec client → notification client
+    if (isCoach && appointment.clientId && appointment.status === 'CONFIRMED') {
+      const clientProfileForNotif = await prisma.clientProfile.findUnique({
+        where: { id: appointment.clientId },
+        select: { userId: true },
+      });
+      if (clientProfileForNotif) {
+        const dateStr = appointment.startAt.toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long',
+        });
+        await prisma.notification.create({
+          data: {
+            userId: clientProfileForNotif.userId,
+            type: 'APPOINTMENT_CANCELLED',
+            title: 'RDV annulé',
+            body: `Votre RDV « ${appointment.title} » prévu le ${dateStr} a été annulé par votre coach.`,
+            data: { appointmentId: appointment.id, title: appointment.title, startAt: appointment.startAt },
+          },
+        });
+      }
+    }
+
     sendSuccess(res, updated, 'RDV annulé');
   } catch (error) {
     console.error('cancelAppointment error:', error);
     sendError(res, "Échec de l'annulation du RDV", 500);
+  }
+};
+
+// PUT /api/appointments/:id — COACH uniquement (modification)
+export const updateAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, startAt, durationMinutes, locationType, locationDetail } = req.body;
+
+    const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: req.user.id } });
+    if (!coachProfile) return sendError(res, 'Profil coach introuvable', 404);
+
+    const appointment = await prisma.appointment.findUnique({ where: { id } });
+    if (!appointment) return sendError(res, 'RDV introuvable', 404);
+    if (appointment.coachId !== coachProfile.id) return sendError(res, 'Accès non autorisé', 403);
+
+    const newStart = startAt ? new Date(startAt) : appointment.startAt;
+    const newDuration = durationMinutes ?? appointment.durationMinutes;
+    const newEnd = new Date(newStart.getTime() + newDuration * 60000);
+
+    // Construire la liste des changements pour la notification
+    const changes = [];
+    if (title && title !== appointment.title) {
+      changes.push(`Titre : « ${appointment.title} » → « ${title} »`);
+    }
+    if (startAt && newStart.getTime() !== appointment.startAt.getTime()) {
+      const oldDate = appointment.startAt.toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const newDate = newStart.toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      changes.push(`Date : ${oldDate} → ${newDate}`);
+    }
+    if (durationMinutes && durationMinutes !== appointment.durationMinutes) {
+      changes.push(`Durée : ${appointment.durationMinutes} min → ${durationMinutes} min`);
+    }
+
+    const updated = await prisma.appointment.update({
+      where: { id },
+      data: {
+        ...(title ? { title } : {}),
+        startAt: newStart,
+        endAt: newEnd,
+        durationMinutes: newDuration,
+        ...(locationType ? { locationType } : {}),
+        ...(locationDetail !== undefined ? { locationDetail } : {}),
+      },
+      include: {
+        coach: { include: { user: true } },
+        client: { include: { user: true } },
+      },
+    });
+
+    // Notification client si RDV CONFIRMED avec client et changements réels
+    if (appointment.clientId && appointment.status === 'CONFIRMED' && changes.length > 0) {
+      const clientProfileForNotif = await prisma.clientProfile.findUnique({
+        where: { id: appointment.clientId },
+        select: { userId: true },
+      });
+      if (clientProfileForNotif) {
+        await prisma.notification.create({
+          data: {
+            userId: clientProfileForNotif.userId,
+            type: 'APPOINTMENT_MODIFIED',
+            title: 'RDV modifié',
+            body: `Votre RDV « ${updated.title} » a été modifié. ${changes.join(' | ')}`,
+            data: { appointmentId: id, changes },
+          },
+        });
+      }
+    }
+
+    sendSuccess(res, updated, 'RDV mis à jour');
+  } catch (error) {
+    console.error('updateAppointment error:', error);
+    sendError(res, 'Échec de la mise à jour du RDV', 500);
   }
 };
 
@@ -424,8 +560,29 @@ export const deleteAppointment = async (req, res) => {
 
     if (appointment.coachId !== coachProfile.id) return sendError(res, 'Accès non autorisé', 403);
 
+    // Notification client si RDV avec client (quel que soit le statut)
+    if (appointment.clientId) {
+      const clientProfileForNotif = await prisma.clientProfile.findUnique({
+        where: { id: appointment.clientId },
+        select: { userId: true },
+      });
+      if (clientProfileForNotif) {
+        const dateStr = appointment.startAt.toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+        });
+        await prisma.notification.create({
+          data: {
+            userId: clientProfileForNotif.userId,
+            type: 'APPOINTMENT_CANCELLED',
+            title: 'RDV annulé',
+            body: `Votre RDV « ${appointment.title} » prévu le ${dateStr} a été annulé par votre coach.`,
+            data: { appointmentId: appointment.id, title: appointment.title, startAt: appointment.startAt },
+          },
+        });
+      }
+    }
+
     if (scope === 'series') {
-      // Supprimer d'abord les enfants, puis le parent
       await prisma.appointment.deleteMany({ where: { parentId: id } });
     }
 

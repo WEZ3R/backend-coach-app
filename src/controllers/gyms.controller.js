@@ -67,6 +67,39 @@ export const searchGyms = async (req, res) => {
 };
 
 /**
+ * Rechercher des salles dans la base par nom (texte libre)
+ * GET /api/gyms/db-search?q=basic-fit&city=Paris
+ */
+export const searchGymsInDb = async (req, res) => {
+  try {
+    const { q, city } = req.query;
+    if (!q || q.trim().length < 2) return sendError(res, 'Paramètre q requis (min 2 caractères)', 400);
+
+    const gyms = await prisma.gym.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              { name: { contains: q.trim(), mode: 'insensitive' } },
+              { brand: { contains: q.trim(), mode: 'insensitive' } },
+              { address: { contains: q.trim(), mode: 'insensitive' } },
+            ],
+          },
+          ...(city ? [{ city: { contains: city.trim(), mode: 'insensitive' } }] : []),
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: 30,
+    });
+
+    sendSuccess(res, gyms, `${gyms.length} salle(s) trouvée(s)`);
+  } catch (error) {
+    console.error('DB search gyms error:', error);
+    sendError(res, 'Erreur lors de la recherche', 500);
+  }
+};
+
+/**
  * Récupérer une salle par ID
  * GET /api/gyms/:id
  */

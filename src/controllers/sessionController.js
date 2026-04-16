@@ -6,7 +6,7 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
  */
 export const upsertSession = async (req, res) => {
   try {
-    const { id, programId, date, status, isRestDay, notes, exercises } = req.body;
+    const { id, programId, date, status, isRestDay, name, notes, exercises } = req.body;
 
     // Vérifier que le coach est propriétaire du programme
     const coachProfile = await prisma.coachProfile.findUnique({
@@ -60,6 +60,7 @@ export const upsertSession = async (req, res) => {
         where: { id: existingSession.id },
         data: {
           status,
+          name: name ?? existingSession.name,
           isRestDay,
           notes,
         },
@@ -80,6 +81,7 @@ export const upsertSession = async (req, res) => {
               sets: ex.sets ?? null,
               reps: ex.reps || null,
               weight: ex.weight || null,
+              weightsPerSet: ex.weightsPerSet ?? null,
               duration: ex.duration || null,
               restTime: ex.restTime || null,
               videoUrl: ex.videoUrl || null,
@@ -99,6 +101,7 @@ export const upsertSession = async (req, res) => {
           programId,
           date: new Date(date),
           status: status || 'DRAFT',
+          name: name || null,
           isRestDay: isRestDay || false,
           notes,
           exercises: exercises
@@ -109,6 +112,7 @@ export const upsertSession = async (req, res) => {
                   sets: ex.sets ?? null,
                   reps: ex.reps || null,
                   weight: ex.weight || null,
+                  weightsPerSet: ex.weightsPerSet ?? null,
                   duration: ex.duration || null,
                   restTime: ex.restTime || null,
                   videoUrl: ex.videoUrl || null,
