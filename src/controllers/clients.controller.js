@@ -383,12 +383,17 @@ export const getProspectiveClients = async (req, res) => {
       const commonGymIds = clientGymIds.filter((id) => coachGymIds.includes(id));
       score += commonGymIds.length * 2;
 
+      const commonLocations = client.gyms
+        .filter((g) => coachGymIds.includes(g.gymId))
+        .map((g) => g.gym?.name || 'Salle commune');
+
       return {
         ...client,
         score,
         matchDetails: {
           cityMatch,
           commonGyms: commonGymIds.length,
+          commonLocations,
         },
       };
     });

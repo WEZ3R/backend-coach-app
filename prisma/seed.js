@@ -36,6 +36,16 @@ const prisma = new PrismaClient();
 const rand = (min, max) => Math.random() * (max - min) + min;
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
 const round1 = (n) => Math.round(n * 10) / 10;
+const roundNearest = (n, step) => Math.round(n / step) * step;
+
+/** Parse "8-10" → [8,10], "5" → [5,5], sinon [8,10] */
+function parseRepsRange(repsStr) {
+  const range = String(repsStr ?? '').match(/^(\d+)[-–](\d+)$/);
+  if (range) return [parseInt(range[1]), parseInt(range[2])];
+  const single = String(repsStr ?? '').match(/^(\d+)/);
+  if (single) { const n = parseInt(single[1]); return [n, n]; }
+  return [8, 10];
+}
 
 /** Date à N jours en arrière, avec offsetMs pour rendre le timestamp unique */
 const dayAt = (daysAgo, offsetMs = 0) => {
@@ -100,7 +110,7 @@ const CLIENTS = [
   { firstName: 'Marie',     lastName: 'Rousseau',   email: 'marie.rousseau@fitflow-seed.com',     gender: 'female', birthYear: 1991, weight: 65,  height: 167, level: 'intermédiaire', goals: 'Améliorer mon endurance cardiovasculaire', coachIndex: 1, program: 'Cardio Endurance – 10km',          weightTrend: 'stable' },
   { firstName: 'Pauline',   lastName: 'Garnier',    email: 'pauline.garnier@fitflow-seed.com',   gender: 'female', birthYear: 1999, weight: 55,  height: 160, level: 'débutant',       goals: 'Perdre du poids et commencer à courir',   coachIndex: 1, program: 'Perte de poids – Cardio',          weightTrend: 'loss' },
   { firstName: 'Théo',      lastName: 'Morin',      email: 'theo.morin@fitflow-seed.com',         gender: 'male',   birthYear: 1983, weight: 78,  height: 176, level: 'intermédiaire', goals: 'Préparer un semi-marathon en 4 mois',      coachIndex: 1, program: 'Cardio Endurance – Semi-marathon',  weightTrend: 'stable' },
-  { firstName: 'Inès',      lastName: 'Lemaire',    email: 'ines.lemaire@fitflow-seed.com',       gender: 'female', birthYear: 1986, weight: 72,  height: 169, level: 'intermédiaire', goals: 'Retrouver la forme après grossesse',       coachIndex: 1, program: 'Remise en forme – Post-natal',      weightTrend: 'loss' },
+  { firstName: 'Inès',      lastName: 'Lemaire',    email: 'ines.lemaire@fitflow-seed.com',       gender: 'female', birthYear: 1986, weight: 72,  height: 169, level: 'intermédiaire', goals: 'Retrouver la forme après grossesse',       coachIndex: 1, program: 'Remise en forme – Post-natal',      weightTrend: 'loss', exerciseSpecialty: 'musculation' },
   { firstName: 'Raphaël',   lastName: 'Simon',      email: 'raphael.simon@fitflow-seed.com',     gender: 'male',   birthYear: 1995, weight: 80,  height: 179, level: 'débutant',       goals: 'Perdre 10 kg en 6 mois',                  coachIndex: 1, program: 'Perte de poids – Cardio',          weightTrend: 'loss' },
   { firstName: 'Jade',      lastName: 'Mercier',    email: 'jade.mercier@fitflow-seed.com',       gender: 'female', birthYear: 2002, weight: 52,  height: 162, level: 'avancé',         goals: 'Performance cardio – compétition',         coachIndex: 1, program: 'Performance – Compétition',        weightTrend: 'stable' },
 
@@ -134,12 +144,12 @@ const CLIENTS = [
 const EXERCISES = {
   musculation: [
     { name: 'Échauffement articulaire',  category: 'WARMUP',     sets: 1, reps: '10min',  restTime: '0' },
-    { name: 'Développé couché barre',    category: 'MAIN',       sets: 4, reps: '8-10',   restTime: '3min', weight: '80kg' },
-    { name: 'Squat barre',               category: 'MAIN',       sets: 4, reps: '5',      restTime: '4min', weight: '100kg' },
-    { name: 'Soulevé de terre',          category: 'MAIN',       sets: 3, reps: '5',      restTime: '4min', weight: '120kg' },
-    { name: 'Tractions lestées',         category: 'MAIN',       sets: 4, reps: '6-8',    restTime: '2min', weight: '+10kg' },
-    { name: 'Développé militaire',       category: 'MAIN',       sets: 3, reps: '10-12',  restTime: '2min', weight: '50kg' },
-    { name: 'Gainage',                   category: 'MAIN',       sets: 3, reps: '60s',    restTime: '1min' },
+    { name: 'Développé couché barre',    category: 'MAIN',       sets: 4, reps: '8-10',   restTime: '3min', weight: '80',  refDbId: 'bench-press-barre-001' },
+    { name: 'Squat barre',               category: 'MAIN',       sets: 4, reps: '5',      restTime: '4min', weight: '100', refDbId: 'squat-barre-001' },
+    { name: 'Soulevé de terre',          category: 'MAIN',       sets: 3, reps: '5',      restTime: '4min', weight: '120', refDbId: 'deadlift-barre-001' },
+    { name: 'Tractions lestées',         category: 'MAIN',       sets: 4, reps: '6-8',    restTime: '2min', weight: '10',  refDbId: 'rowing-barre-001' },
+    { name: 'Développé militaire',       category: 'MAIN',       sets: 3, reps: '10-12',  restTime: '2min', weight: '50',  refDbId: 'ohp-barre-001' },
+    { name: 'Gainage planche',           category: 'MAIN',       sets: 3, reps: '60s',    restTime: '1min' },
     { name: 'Étirements quadriceps',     category: 'STRETCHING', sets: 2, reps: '45s',    restTime: '0' },
     { name: 'Étirements pectoraux',      category: 'STRETCHING', sets: 2, reps: '45s',    restTime: '0' },
   ],
@@ -258,16 +268,28 @@ async function main() {
     console.log(`   ✓ ${cd.firstName} ${cd.lastName}  (${cd.email})`);
   }
 
+  // ── Charger les références exercices (pour les liens exerciseRefId) ─────────
+  const exRefs = await prisma.exerciseReference.findMany({
+    select: { id: true, exerciseDbId: true },
+  });
+  const refMap = new Map(exRefs.map(r => [r.exerciseDbId, r.id]));
+  if (refMap.size === 0) {
+    console.warn('   ⚠️  Aucune ExerciseReference trouvée — exécutez d\'abord seed-fitflow-exercises.js\n');
+  } else {
+    console.log(`   ✓ ${refMap.size} références exercices chargées\n`);
+  }
+
   // ── Créer les clients, programmes, séances et stats ───────────────────────
   console.log('\n👥 Création des clients + données...\n');
 
-  let totalStats    = 0;
-  let totalSessions = 0;
+  let totalStats        = 0;
+  let totalSessions     = 0;
+  let totalSetCompletes = 0;
 
   for (let i = 0; i < CLIENTS.length; i++) {
     const cd    = CLIENTS[i];
     const coach = coachProfiles[cd.coachIndex];
-    const specialty = COACHES[cd.coachIndex].specialty;
+    const specialty = cd.exerciseSpecialty ?? COACHES[cd.coachIndex].specialty;
 
     const birthDate = cd.birthYear
       ? new Date(cd.birthYear, randInt(0, 11), randInt(1, 28))
@@ -355,30 +377,71 @@ async function main() {
 
         const isRest   = offset === 3 && week % 4 === 0;
         const isPast   = dAgo > 0;
+        const isDone   = isPast && !isRest;
         const exs      = isRest ? [] : pickExercises();
 
-        await prisma.session.create({
+        // Pour la musculation : on lie les exercices aux références et on marque la séance complétée
+        const isMusculation = specialty === 'musculation';
+
+        const createdSession = await prisma.session.create({
           data: {
-            programId: program.id,
-            date:      sessionDate,
-            status:    isPast && !isRest ? 'DONE' : 'EMPTY',
-            isRestDay: isRest,
-            notes:     isRest ? 'Récupération active' : null,
+            programId:         program.id,
+            date:              sessionDate,
+            status:            isDone ? 'DONE' : 'EMPTY',
+            completedByClient: isDone && isMusculation,
+            isRestDay:         isRest,
+            notes:             isRest ? 'Récupération active' : null,
             exercises: exs.length > 0
               ? { create: exs.map((ex, order) => ({
-                    name:     ex.name,
-                    category: ex.category,
-                    sets:     ex.sets,
-                    reps:     ex.reps,
-                    weight:   ex.weight ?? null,
-                    restTime: ex.restTime,
-                    duration: ex.duration ?? null,
+                    name:          ex.name,
+                    category:      ex.category,
+                    sets:          ex.sets,
+                    reps:          ex.reps,
+                    weight:        ex.weight ?? null,
+                    restTime:      ex.restTime,
+                    duration:      ex.duration ?? null,
                     order,
+                    exerciseRefId: (isMusculation && ex.refDbId)
+                                     ? (refMap.get(ex.refDbId) ?? null)
+                                     : null,
                   })) }
               : undefined,
           },
+          include: isMusculation && isDone
+            ? { exercises: { select: { id: true, sets: true, reps: true, weight: true, exerciseRefId: true } } }
+            : undefined,
         });
         totalSessions++;
+
+        // ── SetCompletions pour les séances musculation DONE ───────────────
+        if (isMusculation && isDone && createdSession.exercises?.length) {
+          const setRows = [];
+          for (const ex of createdSession.exercises) {
+            if (!ex.exerciseRefId) continue; // pas de ref = pas de SetCompletion
+            const numSets  = ex.sets ?? 3;
+            const [rLo, rHi] = parseRepsRange(ex.reps);
+            const baseW    = parseFloat(ex.weight ?? '') || null;
+
+            for (let s = 1; s <= numSets; s++) {
+              const reps = String(randInt(rLo, rHi));
+              // Variation ±5% sur le poids, arrondie au 2.5 kg le plus proche
+              const weight = baseW != null
+                ? String(roundNearest(baseW * rand(0.93, 1.07), 2.5))
+                : null;
+              setRows.push({
+                exerciseId:   ex.id,
+                setNumber:    s,
+                repsAchieved: reps,
+                weightUsed:   weight,
+                completed:    true,
+              });
+            }
+          }
+          if (setRows.length) {
+            await prisma.setCompletion.createMany({ data: setRows });
+            totalSetCompletes += setRows.length;
+          }
+        }
       }
     }
 
@@ -420,6 +483,8 @@ async function main() {
   console.log(`  • 30 programmes actifs`);
   console.log(`  • ${totalSessions} séances avec exercices`);
   console.log(`  • ${totalStats} entrées de stats quotidiennes`);
+  console.log(`  • ${totalSetCompletes} SetCompletions (musculation)`);
+  console.log(`  • Inès Lemaire : coach Sarah, exercices musculation (volume/1RM activés)`);
   console.log(`  • Mot de passe universel : 123456`);
   console.log('');
   console.log('  👔 Coachs :');
