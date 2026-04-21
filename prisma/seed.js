@@ -4,7 +4,7 @@
  * Crée : 5 coachs, 30 clients (6 par coach), 30 programmes,
  *        ~1600 séances avec exercices, ~2000 stats quotidiennes.
  *
- * Mot de passe de tous les comptes : Password123!
+ * Mot de passe de tous les comptes : 123456
  *
  * NOTE SCHÉMA : DailyStat.date possède un @unique en plus du @@unique([clientId, date]).
  * Ce @unique seul est probablement une erreur (devrait être uniquement la contrainte composée).
