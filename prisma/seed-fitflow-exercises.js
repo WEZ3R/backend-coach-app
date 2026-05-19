@@ -47,7 +47,7 @@ const GROUP_META = {
 const RAW = [
 
   // ══════════════════════════════════════════════
-  //  PECTORAUX (44)
+  //  PECTORAUX (52)
   // ══════════════════════════════════════════════
   ['ff_pec_01', 'DC Barre',                  'Moyen, Triceps, Deltoïde ant.',     'Barre, Banc plat',       'Allongé, pieds au sol. Descendre la barre au milieu de la poitrine. Pousser sans verrouiller les coudes.'],
   ['ff_pec_02', 'DI Barre',                  'Haut (claviculaire), Deltoïde ant.','Barre, Banc incliné',    'Banc à 30-45°. Descendre la barre sur le haut de la poitrine. Pousser verticalement.'],
@@ -93,6 +93,14 @@ const RAW = [
   ['ff_pec_42', 'DC Prise neutre',           'Triceps, Interne',                  'Haltères',               'Paumes face à face. Moins de stress sur les épaules.'],
   ['ff_pec_43', 'Pompes Hindu',              'Global, Souplesse',                 'Poids de corps',         'Mouvement de vague du corps, fesses en l\'air puis rasant le sol.'],
   ['ff_pec_44', 'Floor Press Barre',         'Moyen, Triceps',                    'Barre',                  'DC au sol avec barre. Amplitude réduite, focus sur la fin de poussée.'],
+  ['ff_pec_45', 'Cable Crossover',           'Bas, Interne, Petit pectoral',      'Poulies hautes',         'Poulies hautes, bras tendus. Croiser les mains devant les hanches en pinçant les pecs. Tension constante.'],
+  ['ff_pec_46', 'Cable Fly debout incliné',  'Haut, Interne, Deltoïde ant.',      'Poulies basses',         'Poulies basses, monter les bras en arc devant le visage. Cible la portion claviculaire.'],
+  ['ff_pec_47', 'Cable Fly décliné',         'Bas, Externe, Grand pectoral',      'Poulies hautes',         'Buste légèrement penché en avant, descendre les mains vers les cuisses. Pic du "V" inférieur.'],
+  ['ff_pec_48', 'Cable Press debout',        'Moyen, Triceps, Deltoïde ant.',     'Poulies milieu',         'Poulies à hauteur d\'épaules, pousser horizontalement. Travail fonctionnel des pecs.'],
+  ['ff_pec_49', 'Cable Press incliné',       'Haut, Triceps, Deltoïde ant.',      'Poulies basses + banc', 'Banc incliné devant poulies basses, pousser vers le haut. Tension continue sur le haut des pecs.'],
+  ['ff_pec_50', 'Cable Squeeze Press',       'Interne, Sillon sternal',           'Poulies milieu',         'Mains poignées qui se touchent, pousser devant en serrant les pecs. Focus sur la contraction.'],
+  ['ff_pec_51', 'Cable Fly 1 bras décliné',  'Bas, Externe, Unilatéral',          'Poulie haute',           'Un bras à la fois, descendre la poignée en diagonale vers la hanche opposée.'],
+  ['ff_pec_52', 'Cable Press unilatéral',    'Moyen, Stabilisateurs, Obliques',   'Poulie milieu',          'Un bras à la fois, debout dos à la poulie. Engage le core anti-rotation.'],
 
   // ══════════════════════════════════════════════
   //  DOS (42)
@@ -141,7 +149,7 @@ const RAW = [
   ['ff_dos_42', 'Jefferson Curl',            'Mobilité vertébrale',               'Poids de corps',         'Enrouler le dos vertèbre par vertèbre vers le bas.'],
 
   // ══════════════════════════════════════════════
-  //  ÉPAULES (44)
+  //  ÉPAULES (47)
   // ══════════════════════════════════════════════
   ['ff_epa_01', 'Développé militaire',       'Antérieur, Latéral',                'Barre',                  'Debout, pousser la barre au-dessus de la tête. Gainage fort, ne pas cambrer.'],
   ['ff_epa_02', 'Développé haltères',        'Antérieur, Latéral',                'Haltères',               'Assis ou debout. Pousser les haltères vers le haut sans les entrechoquer.'],
@@ -187,6 +195,9 @@ const RAW = [
   ['ff_epa_42', 'DC neutre épaules',         'Antérieur',                         'Haltères',               'Paumes face à face. Moins de frottements dans l\'articulation.'],
   ['ff_epa_43', 'Front raises TRX',          'Antérieur',                         'TRX',                    'Penché en arrière, monter les bras devant soi pour redresser le corps.'],
   ['ff_epa_44', 'T-Raises (sol)',            'Postérieur',                        'Poids de corps',         'Allongé ventre au sol, lever les bras en "T" pour renforcer l\'arrière d\'épaule.'],
+  ['ff_epa_45', 'Reverse Fly poulie',        'Postérieur, Rhomboïdes, Trapèzes moy.','Poulies hautes',       'Poulies croisées, écarter les bras horizontalement. Isolation pure du deltoïde postérieur.'],
+  ['ff_epa_46', 'Élévation Y poulie',        'Postérieur, Trapèzes inf.',         'Poulies basses',         'Poulies basses croisées, monter en "Y" au-dessus de la tête. Cible l\'arrière et le bas du trapèze.'],
+  ['ff_epa_47', 'Latérale crossbody poulie', 'Latéral (étirement complet)',       'Poulie basse',           'Poulie de l\'autre côté, lever le bras de profil. Amplitude maximale grâce au croisement.'],
 
   // ══════════════════════════════════════════════
   //  BICEPS (44)
@@ -285,7 +296,7 @@ const RAW = [
   ['ff_tri_44', 'Kickback 2 bras simultanés','Vaste externe',                     'Haltères',               'Buste penché, extension des deux bras en même temps.'],
 
   // ══════════════════════════════════════════════
-  //  QUADRICEPS (44)
+  //  QUADRICEPS (47)
   // ══════════════════════════════════════════════
   ['ff_qua_01', 'Squat Barre Haute',         'Global, Quads',                     'Barre',                  'Barre posée sur les trapèzes. Descente profonde, buste le plus vertical possible.'],
   ['ff_qua_02', 'Squat Barre Basse',         'Global, Chaîne post.',              'Barre',                  'Barre sur les deltoïdes postérieurs. Permet de charger plus lourd.'],
@@ -331,9 +342,12 @@ const RAW = [
   ['ff_qua_42', 'Squat Cossack',             'Quads, Souplesse',                  'KB / DB',                'Fente latérale profonde avec pointe de pied opposée vers le haut.'],
   ['ff_qua_43', 'Presse à cuisse verticale', 'Quads',                             'Machine',                'Pousser la charge vers le plafond. Rare mais efficace.'],
   ['ff_qua_44', 'Squat 1/4 (Lockout)',       'Force maximale',                    'Barre',                  'Ne faire que le quart supérieur du mouvement pour habituer le corps au lourd.'],
+  ['ff_qua_45', 'Fente arrière poulie',      'Quads, Fessiers, Stabilité',        'Poulie basse',           'Tenir la poignée devant soi, reculer une jambe en fente. Tension continue sur le quadriceps avant.'],
+  ['ff_qua_46', 'Step-up poulie',            'Quads, Fessiers',                   'Poulie basse + caisse',  'Tenir la poignée, monter sur le step en poussant sur la jambe avant. Cible fortement le vaste interne.'],
+  ['ff_qua_47', 'Cable Sissy Squat',         'Vaste interne, Droit fémoral',      'Poulie basse',           'Genoux qui dépassent loin devant, buste vers l\'arrière. Isolation extrême du quadriceps.'],
 
   // ══════════════════════════════════════════════
-  //  ISCHIOS / FESSIERS (44)
+  //  ISCHIOS / FESSIERS (48)
   // ══════════════════════════════════════════════
   ['ff_isf_01', 'Soulevé de terre Roumain',  'Ischios, Fessiers',                 'Barre',                  'Jambes quasi tendues, descendre la barre en poussant les fesses en arrière.'],
   ['ff_isf_02', 'Leg Curl allongé',          'Ischios (global)',                  'Machine',                'Allongé sur le ventre, ramener les talons aux fesses.'],
@@ -379,9 +393,13 @@ const RAW = [
   ['ff_isf_42', 'GHD Sit-ups',               'Chaîne ant/post',                   'Machine GHD',            'Relevé de buste complet. Travaille la force globale.'],
   ['ff_isf_43', 'Hyperextension focus fessiers','Fessiers',                       'Banc 45°',               'Dos arrondi, pousser le bassin dans le boudin.'],
   ['ff_isf_44', 'Sprint (Démarrage)',         'Fessiers, Ischios',                 'Poids de corps',         'L\'accélération courte est l\'exercice le plus complet pour l\'arrière.'],
+  ['ff_isf_45', 'Hip Thrust poulie',          'Grand fessier, Ischios',            'Poulie basse + banc',    'Dos appuyé sur le banc, sangle de la poulie autour des hanches. Tension constante au verrouillage.'],
+  ['ff_isf_46', 'SDT roumain poulie',         'Ischios, Fessiers, Lombaires',      'Poulie basse + barre',   'Barre à la poulie basse, dos plat, charnière de hanche. Tension continue sur l\'allongement.'],
+  ['ff_isf_47', 'Abduction assise poulie',    'Moyen fessier, Petit fessier',      'Poulie basse + banc',    'Assis sur banc, sangle à la cheville. Écarter la jambe latéralement. Isolation pure du moyen fessier.'],
+  ['ff_isf_48', 'Reverse Hyper poulie',       'Fessiers, Ischios, Lombaires',      'Poulie basse',           'Penché à 90° tenu à la poulie, monter une jambe tendue derrière soi. Faible impact sur la colonne.'],
 
   // ══════════════════════════════════════════════
-  //  MOLLETS (15)
+  //  MOLLETS (18)
   // ══════════════════════════════════════════════
   ['ff_mol_01', 'Mollets debout barre',      'Jumeaux (Gastrocnémiens)',          'Barre',                  'Debout, pointes de pieds sur une cale, monter le plus haut possible.'],
   ['ff_mol_02', 'Mollets debout haltères',   'Jumeaux',                           'Haltères',               'Tenir les haltères sur les côtés, monter sur les pointes.'],
@@ -398,6 +416,9 @@ const RAW = [
   ['ff_mol_13', 'Saut à la corde mollets',   'Global (Explosivité)',              'Corde à sauter',         'Excellent pour la tonicité et le recrutement des fibres rapides.'],
   ['ff_mol_14', 'Mollets unilatéral DB',     'Jumeaux',                           'Haltère',                'Un haltère dans une main (même côté que la jambe travaillée).'],
   ['ff_mol_15', 'Toe Press (Poulie basse)',  'Jumeaux',                           'Poulie basse',           'Assis au sol, tirer la poignée avec les pointes de pieds.'],
+  ['ff_mol_16', 'Mollets debout poulie',     'Jumeaux, Soléaire',                 'Poulie basse + barre',   'Barre à la poulie basse, sur les épaules. Monter sur la pointe des pieds. Permet de charger sans machine dédiée.'],
+  ['ff_mol_17', 'Mollets assis poulie',      'Soléaire',                          'Poulie basse + banc',    'Assis sur banc, sangle sous le genou. Pousser les pointes vers le bas. Cible le soléaire profond.'],
+  ['ff_mol_18', 'Donkey Calf poulie',        'Jumeaux',                           'Poulie basse',           'Penché en avant 90°, sangle sur les hanches. Étirement maximal en bas grâce à la position penchée.'],
 
   // ══════════════════════════════════════════════
   //  CARDIO (25)
@@ -429,7 +450,7 @@ const RAW = [
   ['ff_car_25', 'Slams Ball',                'Puissance',                         'Medball',                'Lever un ballon lesté au-dessus de la tête et le fracasser au sol.'],
 
   // ══════════════════════════════════════════════
-  //  ABDOS / GAINAGE (44)
+  //  ABDOS / GAINAGE (49)
   // ══════════════════════════════════════════════
   ['ff_abd_01', 'Crunch classique',          'Grand droit (haut)',                 'Sol',                    'Allongé, genoux pliés, décoller les épaules du sol en contractant les abdos.'],
   ['ff_abd_02', 'Sit-up',                    'Grand droit, Psoas',                'Sol',                    'Remonter le buste complet jusqu\'aux genoux.'],
@@ -475,6 +496,11 @@ const RAW = [
   ['ff_abd_42', 'Farmer\'s Carry (1 bras)', 'Transverse, Obliques',              'Haltère lourd',          'Marcher avec un poids lourd d\'un seul côté pour contrer le déséquilibre.'],
   ['ff_abd_43', 'Stir the Pot',              'Transverse, Stabilité',             'Swiss Ball',             'En planche coudes sur le ballon, faire des cercles avec les coudes.'],
   ['ff_abd_44', 'Stomach Vacuum',            'Transverse',                        'Poids de corps',         'Expirer tout l\'air et aspirer le nombril vers la colonne. À jeun.'],
+  ['ff_abd_45', 'Woodchopper poulie haute',  'Obliques, Transverse, Grand droit', 'Poulie haute',           'Tirer la poignée en diagonale du haut vers la hanche opposée. Mouvement de bûcheron, rotation du tronc.'],
+  ['ff_abd_46', 'Woodchopper poulie basse',  'Obliques, Transverse, Grand droit', 'Poulie basse',           'Inverse du woodchopper : tirer du bas vers l\'épaule opposée. Travail des obliques en extension.'],
+  ['ff_abd_47', 'Russian Twist poulie',      'Obliques, Transverse',              'Poulie milieu',          'Assis ou debout, bras tendus, faire pivoter le tronc d\'un côté à l\'autre avec tension constante.'],
+  ['ff_abd_48', 'Side Bend poulie',          'Obliques, Carré des lombes',        'Poulie basse',           'Debout de profil, tenir la poignée. Incliner le buste sur le côté opposé puis revenir.'],
+  ['ff_abd_49', 'Reverse Crunch poulie',     'Grand droit (bas), Transverse',     'Poulie basse + sangle',  'Allongé, sangle aux pieds, ramener les genoux à la poitrine en enroulant le bassin.'],
 ];
 
 // ─────────────────────────────────────────────
@@ -549,11 +575,11 @@ async function seed() {
   console.log(`  • ${total} exercices en base`);
   console.log('');
   console.log('  📋 Groupes couverts :');
-  console.log('     Pectoraux (44) · Dos (42) · Épaules (44)');
-  console.log('     Biceps (44) · Triceps (44) · Quadriceps (44)');
-  console.log('     Ischios/Fessiers (44) · Mollets (15) · Cardio (25)');
-  console.log('     Abdos/Gainage (44)');
-  console.log('     Total : 390 exercices\n');
+  console.log('     Pectoraux (52) · Dos (42) · Épaules (47)');
+  console.log('     Biceps (44) · Triceps (44) · Quadriceps (47)');
+  console.log('     Ischios/Fessiers (48) · Mollets (18) · Cardio (25)');
+  console.log('     Abdos/Gainage (49)');
+  console.log('     Total : 416 exercices\n');
 }
 
 seed()

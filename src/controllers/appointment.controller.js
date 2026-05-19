@@ -350,27 +350,43 @@ export const getAppointmentById = async (req, res) => {
   }
 };
 
-// PUT /api/appointments/:id/confirm — CLIENT uniquement
+// PUT /api/appointments/:id/confirm — CLIENT ou COACH (le destinataire de la proposition)
 export const confirmAppointment = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const clientProfile = await prisma.clientProfile.findUnique({ where: { userId: req.user.id } });
-    if (!clientProfile) return sendError(res, 'Profil client introuvable', 404);
-
-    const appointment = await prisma.appointment.findUnique({ where: { id } });
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: { message: true },
+    });
     if (!appointment) return sendError(res, 'RDV introuvable', 404);
-
-    // Vérifier que le client est bien celui du RDV
-    if (appointment.clientId !== clientProfile.id) return sendError(res, 'Accès non autorisé', 403);
-
-    // Vérifier que le statut est PROPOSED
     if (appointment.status !== 'PROPOSED') return sendError(res, 'Ce RDV ne peut pas être confirmé', 400);
+
+    // Vérifier que l'utilisateur est bien participant et destinataire (pas l'expéditeur de la proposition)
+    if (req.user.role === 'CLIENT') {
+      const clientProfile = await prisma.clientProfile.findUnique({ where: { userId: req.user.id } });
+      if (!clientProfile) return sendError(res, 'Profil client introuvable', 404);
+      if (appointment.clientId !== clientProfile.id) return sendError(res, 'Accès non autorisé', 403);
+      // Le client ne peut confirmer que les RDV proposés par le coach
+      if (appointment.message && !appointment.message.isSentByCoach) {
+        return sendError(res, 'Vous ne pouvez pas confirmer votre propre proposition', 403);
+      }
+    } else if (req.user.role === 'COACH') {
+      const coachProfile = await prisma.coachProfile.findUnique({ where: { userId: req.user.id } });
+      if (!coachProfile) return sendError(res, 'Profil coach introuvable', 404);
+      if (appointment.coachId !== coachProfile.id) return sendError(res, 'Accès non autorisé', 403);
+      // Le coach ne peut confirmer que les RDV proposés par le client
+      if (appointment.message && appointment.message.isSentByCoach) {
+        return sendError(res, 'Vous ne pouvez pas confirmer votre propre proposition', 403);
+      }
+    } else {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     // Vérifier les conflits
     const conflict = await checkConflict(
       appointment.coachId,
-      clientProfile.id,
+      appointment.clientId,
       appointment.startAt,
       appointment.endAt,
       id,

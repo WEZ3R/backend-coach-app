@@ -8,8 +8,8 @@ export const getAllCoaches = async (req, res) => {
   try {
     const { city, gym } = req.query;
 
-    // Construire les filtres optionnels
-    const whereFilter = {};
+    // Construire les filtres optionnels — n'expose que les coachs ayant activé leur visibilité
+    const whereFilter = { visibleInSearch: true };
     if (city) {
       whereFilter.city = { contains: city, mode: 'insensitive' };
     }
@@ -18,28 +18,13 @@ export const getAllCoaches = async (req, res) => {
     }
 
     const coaches = await prisma.coachProfile.findMany({
-      where: Object.keys(whereFilter).length > 0 ? whereFilter : undefined,
+      where: whereFilter,
       include: {
         user: {
           select: {
             firstName: true,
             lastName: true,
             email: false, // Ne pas exposer l'email
-          },
-        },
-        posts: {
-          where: {
-            isPublic: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 3, // Seulement les 3 derniers posts pour la preview
-          select: {
-            id: true,
-            mediaType: true,
-            mediaUrl: true,
-            createdAt: true,
           },
         },
         reviews: {
@@ -78,14 +63,6 @@ export const getCoachProfile = async (req, res) => {
             firstName: true,
             lastName: true,
             email: false,
-          },
-        },
-        posts: {
-          where: {
-            isPublic: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
           },
         },
         reviews: {
@@ -156,7 +133,7 @@ export const getMyProfile = async (req, res) => {
 export const updateMyProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { bio, city, isRemote } = req.body;
+    const { bio, city, isRemote, visibleInSearch } = req.body;
 
     // Récupérer le profil coach
     const coachProfile = await prisma.coachProfile.findUnique({
@@ -179,6 +156,12 @@ export const updateMyProfile = async (req, res) => {
       parsedIsRemote = isRemote === 'true' || isRemote === true;
     }
 
+    // Convertir visibleInSearch en booléen si c'est une chaîne (FormData)
+    let parsedVisibleInSearch = coachProfile.visibleInSearch;
+    if (visibleInSearch !== undefined) {
+      parsedVisibleInSearch = visibleInSearch === 'true' || visibleInSearch === true;
+    }
+
     // Mettre à jour le profil
     const updatedProfile = await prisma.coachProfile.update({
       where: { userId },
@@ -186,6 +169,7 @@ export const updateMyProfile = async (req, res) => {
         bio,
         city,
         isRemote: parsedIsRemote,
+        visibleInSearch: parsedVisibleInSearch,
         profilePicture,
       },
       include: {
@@ -283,6 +267,7 @@ export const getRecommendedCoaches = async (req, res) => {
       : [];
 
     const coaches = await prisma.coachProfile.findMany({
+      where: { visibleInSearch: true },
       include: {
         user: { select: { id: true, firstName: true, lastName: true, email: false } },
         gyms: { select: { gymId: true } },

@@ -253,7 +253,7 @@ export const getMyClientProfile = async (req, res) => {
 export const updateMyClientProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { goalCategory, customGoal, level, weight, height, gender, city } = req.body;
+    const { goalCategory, customGoal, level, weight, height, gender, city, visibleInProspection } = req.body;
 
     // Récupérer le profil client
     const clientProfile = await prisma.clientProfile.findUnique({
@@ -281,6 +281,10 @@ export const updateMyClientProfile = async (req, res) => {
         height: height ? parseFloat(height) : clientProfile.height,
         gender: gender !== undefined ? gender : clientProfile.gender,
         city: city !== undefined ? city : clientProfile.city,
+        visibleInProspection:
+          visibleInProspection !== undefined
+            ? visibleInProspection === 'true' || visibleInProspection === true
+            : clientProfile.visibleInProspection,
         profilePicture,
       },
       include: {
@@ -357,6 +361,7 @@ export const getProspectiveClients = async (req, res) => {
 
     const prospectiveClients = await prisma.clientProfile.findMany({
       where: {
+        visibleInProspection: true,
         ...(excludedClientIds.length > 0 && { id: { notIn: excludedClientIds } }),
         OR: whereConditions,
       },

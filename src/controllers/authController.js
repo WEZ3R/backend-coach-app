@@ -109,6 +109,16 @@ export const login = async (req, res) => {
     // Trouver l'utilisateur
     const user = await prisma.user.findUnique({
       where: { email },
+      include: {
+        coachProfile: { include: { gyms: { include: { gym: true } } } },
+        clientProfile: {
+          include: {
+            gyms: { include: { gym: true } },
+            trainingSpots: true,
+            coaches: { where: { isActive: true }, select: { id: true } },
+          },
+        },
+      },
     });
 
     if (!user) {
