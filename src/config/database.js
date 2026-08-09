@@ -4,8 +4,10 @@ import dotenv from 'dotenv';
 // Charger les variables d'environnement avant de créer l'instance Prisma
 dotenv.config();
 
-// Construction dynamique de l'URL à partir des variables individuelles
+// Utilise DATABASE_URL si définie (ex: Docker Compose), sinon la reconstruit
+// à partir des variables individuelles (dev local hors Docker).
 const {
+  DATABASE_URL,
   DB_HOST = 'localhost',
   DB_PORT = '5432',
   DB_USER = 'postgres',
@@ -13,7 +15,7 @@ const {
   DB_NAME = 'coaching_app',
 } = process.env;
 
-const databaseUrl = `postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`;
+const databaseUrl = DATABASE_URL || `postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`;
 
 // Instance unique de Prisma Client
 const prisma = new PrismaClient({
