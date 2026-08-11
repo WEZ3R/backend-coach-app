@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { canAccessProgram, canAccessSession } from '../utils/authorization.js';
 
 /**
  * Créer ou mettre à jour une session
@@ -159,6 +160,10 @@ export const getSessionsByProgram = async (req, res) => {
     const { programId } = req.params;
     const { startDate, endDate } = req.query;
 
+    if (!(await canAccessProgram(req.user.id, programId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const where = {
       programId,
       ...(startDate &&
@@ -200,6 +205,10 @@ export const getSessionsByProgram = async (req, res) => {
 export const getSessionById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await canAccessSession(req.user.id, id))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const session = await prisma.session.findUnique({
       where: { id },
@@ -273,6 +282,10 @@ export const validateSession = async (req, res) => {
     const { id } = req.params;
     const { durationSeconds } = req.body;
 
+    if (!(await canAccessSession(req.user.id, id))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const session = await prisma.session.update({
       where: { id },
       data: {
@@ -306,12 +319,25 @@ export const validateSession = async (req, res) => {
 export const addSessionComment = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { clientId, content, date, isPastComment } = req.body;
+    const { content, date, isPastComment } = req.body;
+
+    if (!(await canAccessSession(req.user.id, sessionId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
+    // Le client du commentaire est déduit du programme de la séance, jamais du corps de
+    // la requête : une séance n'appartient qu'à un seul client, et faire confiance au
+    // clientId envoyé permettait d'écrire un commentaire au nom de n'importe qui.
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { program: { select: { clientId: true } } },
+    });
+    if (!session?.program) return sendError(res, 'Séance introuvable', 404);
 
     const comment = await prisma.comment.create({
       data: {
         sessionId,
-        clientId,
+        clientId: session.program.clientId,
         content,
         date: new Date(date),
         isPastComment,

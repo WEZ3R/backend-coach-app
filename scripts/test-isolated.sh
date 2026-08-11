@@ -16,6 +16,17 @@ DB_URL="postgresql://postgres:postgres@localhost:5432/${TEST_DB}"
 cd "$(dirname "$0")/.."
 
 echo "▸ Base de test : ${TEST_DB}"
+
+if [ "${RESET_DB:-0}" = "1" ]; then
+  # Un serveur de test laissé ouvert garde des connexions et bloque le DROP. On les coupe,
+  # en ciblant strictement la base de test — jamais la base de développement.
+  echo "  fermeture des connexions puis suppression…"
+  docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+     WHERE datname='${TEST_DB}' AND pid <> pg_backend_pid();" >/dev/null
+  docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS ${TEST_DB};"
+fi
+
 if ! docker exec "$PG_CONTAINER" psql -U postgres -tAc \
       "SELECT 1 FROM pg_database WHERE datname='${TEST_DB}'" | grep -q 1; then
   echo "  création…"

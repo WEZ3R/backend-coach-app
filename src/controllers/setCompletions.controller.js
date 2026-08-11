@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { canAccessExercise, canAccessSession } from '../utils/authorization.js';
 
 /**
  * Toggle completion of a specific set
@@ -7,6 +8,10 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
 export const toggleSetCompletion = async (req, res) => {
   try {
     const { exerciseId, setNumber, repsAchieved, weightUsed, rpe } = req.body;
+
+    if (!(await canAccessExercise(req.user.id, exerciseId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     // Check if completion already exists
     const existing = await prisma.setCompletion.findUnique({
@@ -57,6 +62,11 @@ export const updateSetCompletion = async (req, res) => {
     const { exerciseId, setNumber, repsAchieved, weightUsed, rpe } = req.body;
     const rpeParsed = rpe != null ? parseFloat(rpe) : undefined;
 
+    if (!(await canAccessExercise(req.user.id, exerciseId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
+
     const completion = await prisma.setCompletion.upsert({
       where: {
         exerciseId_setNumber: {
@@ -93,6 +103,10 @@ export const getSetCompletions = async (req, res) => {
   try {
     const { exerciseId } = req.params;
 
+    if (!(await canAccessExercise(req.user.id, exerciseId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const completions = await prisma.setCompletion.findMany({
       where: { exerciseId },
       orderBy: { setNumber: 'asc' },
@@ -111,6 +125,10 @@ export const getSetCompletions = async (req, res) => {
 export const getSessionSetCompletions = async (req, res) => {
   try {
     const { sessionId } = req.params;
+
+    if (!(await canAccessSession(req.user.id, sessionId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     // Get all exercises for this session
     const exercises = await prisma.exercise.findMany({
@@ -135,6 +153,10 @@ export const getSessionSetCompletions = async (req, res) => {
 export const deleteSetCompletion = async (req, res) => {
   try {
     const { exerciseId, setNumber } = req.params;
+
+    if (!(await canAccessExercise(req.user.id, exerciseId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     await prisma.setCompletion.delete({
       where: {

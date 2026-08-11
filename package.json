@@ -10,7 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "test": "node --test --test-concurrency=1 __tests__/auth.test.js __tests__/programs.test.js __tests__/sessions.test.js __tests__/stats.test.js __tests__/messages.test.js __tests__/requests.test.js __tests__/goals.test.js __tests__/setCompletions.test.js __tests__/workoutAnalytics.test.js",
+    "test": "node --test --test-concurrency=1 __tests__/auth.test.js __tests__/programs.test.js __tests__/sessions.test.js __tests__/stats.test.js __tests__/messages.test.js __tests__/requests.test.js __tests__/goals.test.js __tests__/setCompletions.test.js __tests__/workoutAnalytics.test.js __tests__/authorization.test.js",
     "test:set-completions": "node --test __tests__/setCompletions.test.js",
     "test:parse": "node --test __tests__/parseSetData.test.js",
     "test:analytics": "node --test __tests__/workoutAnalytics.test.js",
@@ -33,7 +33,8 @@
     "db:backup": "cd scripts && ./export-database.sh",
     "db:restore": "cd scripts && ./import-database.sh",
     "test:isolated": "bash scripts/test-isolated.sh",
-    "test:db:reset": "docker exec fitflow-db psql -U postgres -c \"DROP DATABASE IF EXISTS coaching_app_test\" && bash scripts/test-isolated.sh"
+    "test:db:reset": "RESET_DB=1 bash scripts/test-isolated.sh",
+    "test:authz": "node --test __tests__/authorization.test.js"
   },
   "keywords": [
     "coaching",

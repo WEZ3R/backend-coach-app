@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { canAccessClient } from '../utils/authorization.js';
 
 /**
  * Créer un repas
@@ -7,6 +8,10 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
 export const createMeal = async (req, res) => {
   try {
     const { clientId, date, mealType, description, calories, protein, carbs, fats } = req.body;
+
+    if (!(await canAccessClient(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     // Si une image est uploadée
     const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -43,6 +48,10 @@ export const getClientMeals = async (req, res) => {
     const { clientId } = req.params;
     const { startDate, endDate } = req.query;
 
+    if (!(await canAccessClient(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const where = {
       clientId,
       ...(startDate &&
@@ -74,6 +83,12 @@ export const updateMeal = async (req, res) => {
     const { id } = req.params;
     const { mealType, description, calories, protein, carbs, fats } = req.body;
 
+    const existing = await prisma.meal.findUnique({ where: { id }, select: { clientId: true } });
+    if (!existing) return sendError(res, 'Repas introuvable', 404);
+    if (!(await canAccessClient(req.user.id, existing.clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const meal = await prisma.meal.update({
       where: { id },
       data: {
@@ -102,6 +117,12 @@ export const updateMeal = async (req, res) => {
 export const deleteMeal = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const existing = await prisma.meal.findUnique({ where: { id }, select: { clientId: true } });
+    if (!existing) return sendError(res, 'Repas introuvable', 404);
+    if (!(await canAccessClient(req.user.id, existing.clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const meal = await prisma.meal.delete({
       where: { id },

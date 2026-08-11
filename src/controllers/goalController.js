@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { canAccessProgram } from '../utils/authorization.js';
 
 /**
  * Toggle la completion d'un objectif personnalisé pour une date donnée
@@ -22,10 +23,17 @@ export const toggleGoalCompletion = async (req, res) => {
     // Vérifier que l'objectif existe
     const goal = await prisma.customGoal.findUnique({
       where: { id: goalId },
+      select: { id: true, programId: true },
     });
 
     if (!goal) {
       return sendError(res, 'Goal not found', 404);
+    }
+
+    // Un CustomGoal appartient à un Program, jamais directement au client : sans cette
+    // vérification, n'importe qui pouvait valider l'objectif du programme d'un autre.
+    if (!(await canAccessProgram(req.user.id, goal.programId))) {
+      return sendError(res, 'Accès non autorisé', 403);
     }
 
     const completionDate = new Date(date);

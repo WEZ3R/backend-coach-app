@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { ownsTemplate } from '../utils/authorization.js';
 import { computeNutrition } from './nutrition.controller.js';
 
 /**
@@ -172,6 +173,10 @@ export const getCoachTemplates = async (req, res) => {
 export const getTemplateById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await ownsTemplate(req.user.id, id))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const template = await prisma.programTemplate.findUnique({
       where: { id },
@@ -407,6 +412,10 @@ export const updateTemplate = async (req, res) => {
 export const deleteTemplate = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await ownsTemplate(req.user.id, id))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     await prisma.programTemplate.delete({
       where: { id },

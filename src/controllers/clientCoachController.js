@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { canAccessClient, canAccessRelation, resolveProfiles } from '../utils/authorization.js';
 
 /**
  * Ajouter un coach à un client
@@ -68,6 +69,10 @@ export const getClientCoaches = async (req, res) => {
   try {
     const { clientId } = req.params;
 
+    if (!(await canAccessClient(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const clientCoaches = await prisma.clientCoach.findMany({
       where: {
         clientId,
@@ -107,6 +112,11 @@ export const getCoachClients = async (req, res) => {
   try {
     const { coachId } = req.params;
 
+    const { coachProfile } = await resolveProfiles(req.user.id);
+    if (coachProfile?.id !== coachId) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const coachClients = await prisma.clientCoach.findMany({
       where: {
         coachId,
@@ -145,6 +155,10 @@ export const getCoachClients = async (req, res) => {
 export const setPrimaryCoach = async (req, res) => {
   try {
     const { id } = req.params; // ID de la relation ClientCoach
+
+    if (!(await canAccessRelation(req.user.id, id))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const relation = await prisma.clientCoach.findUnique({
       where: { id },
@@ -202,6 +216,10 @@ export const setPrimaryCoach = async (req, res) => {
 export const removeCoachFromClient = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!(await canAccessRelation(req.user.id, id))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const relation = await prisma.clientCoach.update({
       where: { id },

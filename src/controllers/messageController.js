@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { canAccessClient, canAccessConversation } from '../utils/authorization.js';
 
 /**
  * Envoyer un message
@@ -37,6 +38,10 @@ export const sendMessage = async (req, res) => {
 export const getConversation = async (req, res) => {
   try {
     const { coachId, clientId } = req.params;
+
+    if (!(await canAccessConversation(req.user.id, coachId, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const messages = await prisma.message.findMany({
       where: {
@@ -79,6 +84,10 @@ export const getClientTips = async (req, res) => {
     const { clientId } = req.params;
     const { upcoming } = req.query; // Si true, récupérer seulement les tips futurs
 
+    if (!(await canAccessClient(req.user.id, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     const where = {
       clientId,
       type: 'TIP',
@@ -107,6 +116,15 @@ export const getClientTips = async (req, res) => {
 export const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const existing = await prisma.message.findUnique({
+      where: { id },
+      select: { coachId: true, clientId: true },
+    });
+    if (!existing) return sendError(res, 'Message introuvable', 404);
+    if (!(await canAccessConversation(req.user.id, existing.coachId, existing.clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     const message = await prisma.message.update({
       where: { id },
@@ -231,6 +249,10 @@ export const markConversationAsRead = async (req, res) => {
     const { coachId, clientId } = req.params;
     const { role } = req.user;
 
+    if (!(await canAccessConversation(req.user.id, coachId, clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
+
     // Le client lit les messages du coach, le coach lit les messages du client
     const isSentByCoach = role === 'CLIENT';
 
@@ -304,6 +326,15 @@ export const getUnreadCount = async (req, res) => {
 export const deleteMessage = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const existing = await prisma.message.findUnique({
+      where: { id },
+      select: { coachId: true, clientId: true },
+    });
+    if (!existing) return sendError(res, 'Message introuvable', 404);
+    if (!(await canAccessConversation(req.user.id, existing.coachId, existing.clientId))) {
+      return sendError(res, 'Accès non autorisé', 403);
+    }
 
     await prisma.message.delete({
       where: { id },
