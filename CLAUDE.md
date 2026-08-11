@@ -16,7 +16,7 @@ fitflow-backend/
 │   ├── config/              # Configuration
 │   │   ├── database.js      # Client Prisma
 │   │   └── env.js           # Variables d'environnement
-│   ├── controllers/         # Logique métier (17 controllers)
+│   ├── controllers/         # Logique métier (24 controllers)
 │   │   ├── authController.js
 │   │   ├── programController.js
 │   │   ├── sessionController.js
@@ -25,7 +25,7 @@ fitflow-backend/
 │   │   ├── statController.js
 │   │   ├── messageController.js
 │   │   └── ...
-│   ├── routes/              # Définition des routes API (14 fichiers)
+│   ├── routes/              # Définition des routes API (22 fichiers)
 │   ├── middlewares/         # Middlewares Express
 │   │   ├── auth.js          # Authentification JWT & autorisation
 │   │   └── upload.js        # Upload fichiers avec multer

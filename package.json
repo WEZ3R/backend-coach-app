@@ -31,7 +31,9 @@
     "env:auto": "bash scripts/switch-env.sh auto",
     "db:host": "node scripts/detect-db-host.js",
     "db:backup": "cd scripts && ./export-database.sh",
-    "db:restore": "cd scripts && ./import-database.sh"
+    "db:restore": "cd scripts && ./import-database.sh",
+    "test:isolated": "bash scripts/test-isolated.sh",
+    "test:db:reset": "docker exec fitflow-db psql -U postgres -c \"DROP DATABASE IF EXISTS coaching_app_test\" && bash scripts/test-isolated.sh"
   },
   "keywords": [
     "coaching",

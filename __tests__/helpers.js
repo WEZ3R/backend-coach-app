@@ -2,7 +2,9 @@
  * Utilitaires partagés pour les tests d'intégration
  */
 
-const BASE_URL = 'http://localhost:5001/api';
+// Les tests d'intégration créent de vrais comptes en base. TEST_API_URL permet de les
+// diriger vers une instance dédiée (base coaching_app_test) plutôt que le serveur de dev.
+const BASE_URL = process.env.TEST_API_URL || 'http://localhost:5001/api';
 
 /**
  * Génère un suffixe unique basé sur timestamp + aléatoire pour éviter les collisions

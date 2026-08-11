@@ -31,7 +31,7 @@ function dateLocal(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const BASE = 'http://localhost:5001/api';
+const BASE = process.env.TEST_API_URL || 'http://localhost:5001/api';
 const SUFFIX = Date.now(); // Évite les collisions d'email entre runs
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

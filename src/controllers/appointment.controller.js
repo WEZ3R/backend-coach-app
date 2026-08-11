@@ -3,6 +3,10 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
 import rrulePkg from 'rrule';
 const { RRule } = rrulePkg;
 
+// Champs User exposables dans une réponse API.
+// Sans ce select, `include: { user: USER_PUBLIC }` renvoie aussi le hash bcrypt du mot de passe.
+const USER_PUBLIC = { select: { id: true, email: true, firstName: true, lastName: true } };
+
 // Vérifie qu'aucun appointment CONFIRMED ne chevauche pour le coach (ou le client si présent)
 const checkConflict = async (coachId, clientId, startAt, endAt, excludeId = null) => {
   const conditions = [{ coachId }];
@@ -263,8 +267,8 @@ export const getAppointments = async (req, res) => {
     };
 
     const include = req.user.role === 'COACH'
-      ? { client: { include: { user: true } } }
-      : { coach: { include: { user: true } } };
+      ? { client: { include: { user: USER_PUBLIC } } }
+      : { coach: { include: { user: USER_PUBLIC } } };
 
     const appointments = await prisma.appointment.findMany({
       where,
@@ -301,8 +305,8 @@ export const getUpcomingAppointments = async (req, res) => {
         status: { not: 'CANCELLED' },
       },
       include: {
-        coach: { include: { user: true } },
-        client: { include: { user: true } },
+        coach: { include: { user: USER_PUBLIC } },
+        client: { include: { user: USER_PUBLIC } },
       },
       orderBy: { startAt: 'asc' },
       take: 3,
@@ -323,8 +327,8 @@ export const getAppointmentById = async (req, res) => {
     const appointment = await prisma.appointment.findUnique({
       where: { id },
       include: {
-        coach: { include: { user: true } },
-        client: { include: { user: true } },
+        coach: { include: { user: USER_PUBLIC } },
+        client: { include: { user: USER_PUBLIC } },
         message: true,
       },
     });
@@ -531,8 +535,8 @@ export const updateAppointment = async (req, res) => {
         ...(locationDetail !== undefined ? { locationDetail } : {}),
       },
       include: {
-        coach: { include: { user: true } },
-        client: { include: { user: true } },
+        coach: { include: { user: USER_PUBLIC } },
+        client: { include: { user: USER_PUBLIC } },
       },
     });
 

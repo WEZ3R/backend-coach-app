@@ -1,6 +1,9 @@
 import cron from 'node-cron';
 import prisma from '../config/database.js';
 
+// Seuls les champs réellement utilisés ici — évite de charger le hash du mot de passe.
+const USER_PUBLIC = { select: { id: true, firstName: true, lastName: true } };
+
 // Chaque jour à 8h00 — envoi des rappels J-1 (TIP dans la conversation)
 cron.schedule('0 8 * * *', async () => {
   try {
@@ -14,9 +17,17 @@ cron.schedule('0 8 * * *', async () => {
       },
     });
 
+    // La fenêtre couvre 24h glissantes : un RDV de cet après-midi y figure aussi.
+    // On compare donc les dates calendaires plutôt que d'écrire « demain » systématiquement.
+    const isSameCalendarDay = (a, b) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+
     for (const appt of upcoming) {
       const dateStr = appt.startAt.toLocaleDateString('fr-FR');
-      const content = `Rappel : RDV « ${appt.title} » demain ${dateStr}.`;
+      const when = isSameCalendarDay(appt.startAt, now) ? "aujourd'hui" : 'demain';
+      const content = `Rappel : RDV « ${appt.title} » ${when} ${dateStr}.`;
 
       if (appt.clientId) {
         await prisma.message.create({
@@ -53,8 +64,8 @@ cron.schedule('*/5 * * * *', async () => {
         startAt: { gte: windowStart, lte: windowEnd },
       },
       include: {
-        coach: { include: { user: true } },
-        client: { include: { user: true } },
+        coach: { include: { user: USER_PUBLIC } },
+        client: { include: { user: USER_PUBLIC } },
       },
     });
 
