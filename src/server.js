@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './config/env.js';
 import prisma from './config/database.js';
+import { authLimiter, apiLimiter } from './middlewares/rateLimit.js';
 
 // Import des routes
 import authRoutes from './routes/auth.js';
@@ -30,6 +32,14 @@ import './jobs/appointmentReminders.js';
 
 const app = express();
 
+// Derrière le proxy de Fly.io : sans cela, req.ip vaut l'adresse du proxy et le
+// limiteur de débit compterait tous les visiteurs comme un seul client.
+if (config.isProduction) app.set('trust proxy', 1);
+
+// En-têtes de sécurité. crossOriginResourcePolicy est désactivé car /uploads sert
+// des images consommées depuis une autre origine (le dashboard).
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
 // Middlewares globaux
 app.use(cors({
   origin: config.nodeEnv === 'development' ? '*' : config.cors.origin,
@@ -42,8 +52,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Servir les fichiers statiques (uploads)
 app.use('/uploads', express.static('uploads'));
 
+// Limiteur général, puis limiteur strict sur l'authentification (le plus exposé
+// au bourrinage de mots de passe).
+app.use('/api', apiLimiter);
+
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/meals', mealRoutes);

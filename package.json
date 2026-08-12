@@ -34,7 +34,9 @@
     "db:restore": "cd scripts && ./import-database.sh",
     "test:isolated": "bash scripts/test-isolated.sh",
     "test:db:reset": "RESET_DB=1 bash scripts/test-isolated.sh",
-    "test:authz": "node --test __tests__/authorization.test.js"
+    "test:authz": "node --test __tests__/authorization.test.js",
+    "supabase:check": "node scripts/supabase-check.mjs",
+    "supabase:migrate": "bash scripts/supabase-migrate.sh"
   },
   "keywords": [
     "coaching",
@@ -45,21 +47,26 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.9.1",
-    "bcrypt": "^5.1.1",
+    "@supabase/supabase-js": "^2.112.3",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
-    "express": "^4.18.2",
-    "express-validator": "^7.0.1",
+    "express": "^4.22.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
-    "node-cron": "^3.0.3",
+    "multer": "^2.2.0",
+    "node-cron": "^4.6.0",
     "pg": "^8.16.3",
+    "prisma": "^5.9.1",
     "rrule": "^2.8.1"
   },
   "devDependencies": {
     "node-fetch": "^3.3.2",
     "nodemon": "^3.0.3",
-    "prisma": "^5.9.1",
     "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "path-to-regexp": "0.1.13"
   }
 }
