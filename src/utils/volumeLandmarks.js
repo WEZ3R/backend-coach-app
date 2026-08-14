@@ -5,7 +5,9 @@
  * MRV = Maximum Recoverable Volume (seuil de surentraînement)
  */
 
-const LANDMARKS = {
+// Exporté : le contrôleur le déstructure depuis le module. Sans le mot-clé
+// `export`, il ne recevait qu'`undefined` et l'endpoint échouait en 500.
+export const LANDMARKS = {
   CHEST: { mev: 10, mavLow: 12, mavHigh: 20, mrv: 22 },
   BACK: { mev: 10, mavLow: 14, mavHigh: 22, mrv: 25 },
   UPPER_LEGS: { mev: 6, mavLow: 12, mavHigh: 18, mrv: 20 },
@@ -23,10 +25,6 @@ const LANDMARKS = {
  * @returns {'below_mev' | 'mev_to_mav' | 'mav' | 'mav_to_mrv' | 'above_mrv'}
  */
 export function getZone(weeklyAvgSets, landmarks) {
-  return getVolumeZone(weeklyAvgSets, landmarks);
-}
-
-export function getVolumeZone(weeklyAvgSets, landmarks) {
   const { mev, mavLow, mavHigh, mrv } = landmarks;
   if (weeklyAvgSets < mev) return 'below_mev';
   if (weeklyAvgSets < mavLow) return 'mev_to_mav';
@@ -34,14 +32,3 @@ export function getVolumeZone(weeklyAvgSets, landmarks) {
   if (weeklyAvgSets <= mrv) return 'mav_to_mrv';
   return 'above_mrv';
 }
-
-/**
- * Retourne les landmarks pour un groupe musculaire donné.
- * @param {string} bodyPart - ex: 'CHEST', 'BACK', 'UPPER_LEGS'
- * @returns {{ mev, mavLow, mavHigh, mrv } | null}
- */
-export function getLandmarks(bodyPart) {
-  return LANDMARKS[bodyPart] || null;
-}
-
-export const volumeLandmarks = { getLandmarks, getVolumeZone, getZone, LANDMARKS };

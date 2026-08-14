@@ -56,16 +56,19 @@ function getStandardKey(bodyParts, equipments) {
 /**
  * Classifie le niveau d'un athlète selon son ratio 1RM/poids de corps.
  * @param {number} ratio
- * @param {string} gender - 'M', 'F', ou autre (défaut 'M')
+ * @param {string} gender - 'F' / 'female' / 'femme' → barème féminin, sinon masculin
  * @param {string[]} bodyParts
  * @param {string[]} equipments
  * @returns {{ level: string|null, levelIndex: number, levelLabel: string|null, nextLevel: string|null, nextLevelRatio: number|null }}
  */
-export function classify(ratio, gender, bodyParts, equipments) {
+function classify(ratio, gender, bodyParts, equipments) {
   const key = getStandardKey(bodyParts, equipments);
   if (!key) return { level: null, levelIndex: -1, levelLabel: null, nextLevel: null, nextLevelRatio: null };
 
-  const g = (gender === 'F') ? 'F' : 'M';
+  // ClientProfile.gender vaut 'male' / 'female' en base, pas 'M' / 'F'. Le test
+  // strict `gender === 'F'` ne matchait donc jamais et toutes les clientes étaient
+  // évaluées au barème masculin — un niveau trop bas la plupart du temps.
+  const g = /^(f|female|femme)$/i.test(String(gender ?? '')) ? 'F' : 'M';
   const table = STANDARDS[key][g];
 
   let level = 'beginner';

@@ -6,15 +6,6 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
 const DEFAULT_SURPLUS = 300;   // kcal — prise de masse
 const DEFAULT_DEFICIT = 400;   // kcal — sèche
 
-// Facteurs d'activité suggérés
-export const ACTIVITY_FACTORS = [
-  { value: 1.2,  label: 'Sédentaire',             detail: 'Peu ou pas d\'exercice' },
-  { value: 1.37, label: 'Activité légère',         detail: '1–3 séances/semaine' },
-  { value: 1.55, label: 'Entraînement modéré',     detail: '3–5 séances/semaine' },
-  { value: 1.72, label: 'Entraînement intense',    detail: '6–7 séances/semaine' },
-  { value: 1.9,  label: 'Très intense',            detail: '2× par jour ou travail physique' },
-];
-
 // ─── Moteur de calcul (pur, sans DB) ─────────────────────────────────────────
 
 export function computeNutrition({ gender, weight, height, age, activityFactor, objective, surplus, deficit }) {

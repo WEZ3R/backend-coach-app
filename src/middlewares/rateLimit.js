@@ -16,6 +16,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from '../config/env.js';
 
 const disabled = config.nodeEnv === 'test';
+const isProduction = config.nodeEnv === 'production';
 
 /** Renvoie un middleware neutre en test, le limiteur réel sinon. */
 const build = (options) =>
@@ -26,13 +27,21 @@ const build = (options) =>
   });
 
 /**
- * Authentification : 10 tentatives par IP et par quart d'heure.
+ * Authentification : 10 tentatives ratées par IP et par quart d'heure en
+ * production, 100 ailleurs.
+ *
  * `skipSuccessfulRequests` fait que seules les tentatives ratées comptent — une
  * personne qui se connecte normalement n'est jamais gênée.
+ *
+ * Le seuil est relevé hors production parce qu'en développement les échecs
+ * légitimes sont nombreux : un seed qui recrée les comptes, un mot de passe tapé
+ * de travers, un script de test. Le limiteur reste actif pour que son
+ * comportement soit exercé, mais il ne bloque plus le travail. 10 reste la valeur
+ * qui compte : c'est celle qui s'applique en production.
  */
 export const authLimiter = build({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: isProduction ? 10 : 100,
   skipSuccessfulRequests: true,
   message: {
     success: false,
