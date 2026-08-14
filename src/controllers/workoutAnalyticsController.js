@@ -1,29 +1,9 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
 import { parseNumericField, estimate1RM, getISOWeek } from '../utils/parseSetData.js';
-
-/**
- * Bornes d'une plage de jours, en incluant réellement le jour de fin.
- *
- * `new Date('2026-08-11')` vaut minuit UTC. Utilisé tel quel en `lte`, il excluait
- * tout ce qui suit minuit — donc la totalité du jour de fin. Une requête sur une
- * seule journée (startDate === endDate) renvoyait un intervalle vide.
- *
- * On élargit d'une journée de chaque côté : les séances sont enregistrées à minuit
- * LOCAL, ce qui décale l'horodatage UTC de plusieurs heures selon le fuseau, et
- * une borne UTC stricte laisse tomber les journées de bord.
- */
-function dayRange(startDate, endDate) {
-  const gte = new Date(startDate);
-  gte.setUTCHours(0, 0, 0, 0);
-  gte.setUTCDate(gte.getUTCDate() - 1);
-
-  const lte = new Date(endDate);
-  lte.setUTCHours(23, 59, 59, 999);
-  lte.setUTCDate(lte.getUTCDate() + 1);
-
-  return { gte, lte };
-}
+// dayRange et fetchCompletedSessionsWithSets vivent dans un service partagé :
+// analyticsController en a besoin pour joindre la performance aux données du jour.
+import { dayRange, fetchCompletedSessionsWithSets } from '../services/workoutData.js';
 
 /**
  * Vérifie que le coach authentifié possède bien ce client.
@@ -46,38 +26,6 @@ async function resolveCoachClient(req, clientId) {
   if (!relation) return null;
 
   return { coachId: coachProfile.id, clientProfile: relation.client };
-}
-
-/**
- * Requête commune : sessions complétées du client dans la période,
- * avec exercises (MAIN, avec ref) et leurs setCompletions.
- */
-async function fetchCompletedSessionsWithSets(coachId, clientId, startDate, endDate) {
-  return prisma.session.findMany({
-    where: {
-      program: { coachId, clientId },
-      completedByClient: true,
-      isRestDay: false,
-      date: dayRange(startDate, endDate),
-    },
-    include: {
-      exercises: {
-        where: {
-          exerciseRefId: { not: null },
-          category: 'MAIN',
-        },
-        include: {
-          exerciseRef: {
-            select: { id: true, name: true, bodyParts: true, equipments: true },
-          },
-          setCompletions: {
-            where: { completed: true },
-          },
-        },
-      },
-    },
-    orderBy: { date: 'asc' },
-  });
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

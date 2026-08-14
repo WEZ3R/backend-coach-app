@@ -1,5 +1,11 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import {
+  fetchCompletedSessionsWithSets,
+  computeBest1RM,
+  computeDailyPerformance,
+  localDay,
+} from '../services/workoutData.js';
 
 /**
  * Récupérer la liste de tous les clients du coach
@@ -131,25 +137,57 @@ export const getClientStats = async (req, res) => {
       dateFilter.lte = new Date(endDate);
     }
 
-    // Récupérer les statistiques pour chaque client
+    // Récupérer les statistiques pour chaque client, enrichies des métriques de
+    // performance du jour.
+    //
+    // POURQUOI LES JOINDRE ICI
+    // Le coach doit pouvoir rapprocher un apport calorique d'une performance : deux
+    // séries tracées sur des axes temporels séparés ne se comparent pas à l'œil. On
+    // les livre donc sur la MÊME ligne de jour, quitte à laisser les champs nuls les
+    // jours sans séance — une valeur nulle laisse un trou dans la courbe, ce qui est
+    // exact, alors qu'un zéro suggérerait un entraînement sans intensité.
     const statsData = await Promise.all(
       clients.map(async (client) => {
-        const stats = await prisma.dailyStat.findMany({
-          where: {
-            clientId: client.id,
-            ...(Object.keys(dateFilter).length > 0 && {
-              date: dateFilter,
-            }),
-          },
-          orderBy: {
-            date: 'asc',
-          },
-        });
+        const [stats, sessions] = await Promise.all([
+          prisma.dailyStat.findMany({
+            where: {
+              clientId: client.id,
+              ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+            },
+            orderBy: { date: 'asc' },
+          }),
+          startDate && endDate
+            ? fetchCompletedSessionsWithSets(coachId, client.id, startDate, endDate)
+            : Promise.resolve([]),
+        ]);
+
+        // Le 1RM de référence se cherche au-delà de la fenêtre affichée : sans
+        // antériorité, les premiers jours n'auraient aucun pourcentage de 1RM.
+        let perf = new Map();
+        if (sessions.length) {
+          const refStart = new Date(startDate);
+          refStart.setDate(refStart.getDate() - 56);
+          const refSessions = await fetchCompletedSessionsWithSets(
+            coachId, client.id,
+            refStart.toISOString().split('T')[0], endDate,
+          );
+          perf = computeDailyPerformance(sessions, computeBest1RM(refSessions));
+        }
 
         return {
           clientId: client.id,
           clientName: `${client.user.firstName} ${client.user.lastName}`,
-          stats: stats,
+          stats: stats.map((s) => {
+            const p = perf.get(localDay(s.date));
+            return {
+              ...s,
+              inol: p?.inol ?? null,
+              tonnage: p?.tonnage ?? null,
+              setsDone: p?.setsDone ?? null,
+              topPct1RM: p?.topPct1RM ?? null,
+              best1RM: p?.best1RM ?? null,
+            };
+          }),
         };
       })
     );
