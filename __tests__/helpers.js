@@ -2,9 +2,49 @@
  * Utilitaires partagés pour les tests d'intégration
  */
 
-// Les tests d'intégration créent de vrais comptes en base. TEST_API_URL permet de les
-// diriger vers une instance dédiée (base coaching_app_test) plutôt que le serveur de dev.
+// Les tests d'intégration créent de vrais comptes en base. TEST_API_URL les dirige
+// vers une instance dédiée (base coaching_app_test) plutôt que le serveur de dev.
 const BASE_URL = process.env.TEST_API_URL || 'http://localhost:5001/api';
+
+/**
+ * GARDE-FOU : refuse de tourner contre une instance qui n'est pas en mode test.
+ *
+ * Les tests s'inscrivent, créent des programmes, des séances, des messages. Lancés
+ * par mégarde contre le serveur de développement — ce que faisait `npm test` sans
+ * TEST_API_URL — ils sèment des dizaines de comptes @test.com dans la base de
+ * travail. Plus de 160 y avaient été trouvés.
+ *
+ * La vérification est faite ICI, au chargement du module, donc AVANT la moindre
+ * écriture : ce fichier est importé par toutes les suites. Un `await` de premier
+ * niveau suffit à faire échouer le fichier de test avant son premier `test()`.
+ *
+ * Conséquence voulue : `node --test __tests__/auth.test.js` échoue tout seul. Il
+ * faut passer par `npm test`, qui monte la base et le serveur dédiés.
+ */
+async function assertTestInstance() {
+  const healthUrl = `${BASE_URL.replace(/\/$/, '')}/health`;
+  let payload;
+  try {
+    const res = await fetch(healthUrl, { signal: AbortSignal.timeout(4000) });
+    payload = await res.json();
+  } catch (err) {
+    throw new Error(
+      `Aucune API joignable sur ${healthUrl} (${err.message}).\n` +
+      `→ Lancez « npm test », qui démarre une base et un serveur de test dédiés.`,
+    );
+  }
+
+  if (payload?.env !== 'test') {
+    throw new Error(
+      `REFUS : l'API de ${BASE_URL} tourne en NODE_ENV=${payload?.env ?? 'inconnu'}, pas « test ».\n` +
+      `Les tests créent de vrais comptes et pollueraient cette base.\n` +
+      `→ Lancez « npm test » (base et serveur isolés), ou exportez TEST_API_URL\n` +
+      `  vers une instance démarrée avec NODE_ENV=test.`,
+    );
+  }
+}
+
+await assertTestInstance();
 
 /**
  * Génère un suffixe unique basé sur timestamp + aléatoire pour éviter les collisions

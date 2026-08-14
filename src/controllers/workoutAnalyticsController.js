@@ -3,6 +3,29 @@ import { sendSuccess, sendError } from '../utils/responseHandler.js';
 import { parseNumericField, estimate1RM, getISOWeek } from '../utils/parseSetData.js';
 
 /**
+ * Bornes d'une plage de jours, en incluant réellement le jour de fin.
+ *
+ * `new Date('2026-08-11')` vaut minuit UTC. Utilisé tel quel en `lte`, il excluait
+ * tout ce qui suit minuit — donc la totalité du jour de fin. Une requête sur une
+ * seule journée (startDate === endDate) renvoyait un intervalle vide.
+ *
+ * On élargit d'une journée de chaque côté : les séances sont enregistrées à minuit
+ * LOCAL, ce qui décale l'horodatage UTC de plusieurs heures selon le fuseau, et
+ * une borne UTC stricte laisse tomber les journées de bord.
+ */
+function dayRange(startDate, endDate) {
+  const gte = new Date(startDate);
+  gte.setUTCHours(0, 0, 0, 0);
+  gte.setUTCDate(gte.getUTCDate() - 1);
+
+  const lte = new Date(endDate);
+  lte.setUTCHours(23, 59, 59, 999);
+  lte.setUTCDate(lte.getUTCDate() + 1);
+
+  return { gte, lte };
+}
+
+/**
  * Vérifie que le coach authentifié possède bien ce client.
  * Retourne { coachId, clientProfile } ou null si accès refusé.
  */
@@ -35,10 +58,7 @@ async function fetchCompletedSessionsWithSets(coachId, clientId, startDate, endD
       program: { coachId, clientId },
       completedByClient: true,
       isRestDay: false,
-      date: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      },
+      date: dayRange(startDate, endDate),
     },
     include: {
       exercises: {
@@ -202,10 +222,7 @@ export const getCompletionAndStreak = async (req, res) => {
       where: {
         program: { coachId: access.coachId, clientId },
         isRestDay: false,
-        date: {
-          gte: new Date(startDate),
-          lte: new Date(endDate),
-        },
+        date: dayRange(startDate, endDate),
       },
       orderBy: { date: 'asc' },
       select: { id: true, date: true, completedByClient: true },
@@ -367,12 +384,22 @@ export const getSessionINOL = async (req, res) => {
       const exerciseINOL = [];
       let totalINOL = 0;
 
+      // INOL par groupe musculaire : agrégé depuis les exercices, via leurs
+      // bodyParts. Un exercice qui sollicite deux groupes compte dans les deux —
+      // c'est bien une charge subie par chacun, pas une part à découper.
+      const byMuscle = new Map();
+
       for (const exercise of session.exercises) {
         const refId = exercise.exerciseRefId;
         const ref1RM = best1RM.get(refId);
         if (!ref1RM) continue;
 
         let exerciseTotal = 0;
+        let countedSets = 0;
+        let topPct = 0;
+        let topWeight = 0;
+        let totalReps = 0;
+
         for (const sc of exercise.setCompletions) {
           const w = parseNumericField(sc.weightUsed, 'high');
           const r = parseNumericField(sc.repsAchieved, 'high');
@@ -381,22 +408,47 @@ export const getSessionINOL = async (req, res) => {
           const denominator = 100 - pct1RM;
           if (denominator <= 0) continue; // poids >= 1RM, INOL non défini
           exerciseTotal += r / denominator;
+          countedSets++;
+          totalReps += r;
+          if (pct1RM > topPct) { topPct = pct1RM; topWeight = w; }
         }
 
         if (exerciseTotal > 0) {
+          const rounded = Math.round(exerciseTotal * 100) / 100;
           exerciseINOL.push({
+            // Clé d'appariement pour l'interface : le NOM du catalogue diffère
+            // souvent de celui saisi dans la séance (« DC Barre » contre
+            // « Développé couché barre »), un rapprochement par nom échouerait.
+            exerciseRefId: refId,
             exerciseName: exercise.exerciseRef.name,
-            inol: Math.round(exerciseTotal * 100) / 100,
+            bodyParts: exercise.exerciseRef.bodyParts,
+            inol: rounded,
+            // Le détail qui rend le chiffre lisible : sans le %1RM et la charge,
+            // un INOL de 0,9 ne dit pas s'il vient de séries lourdes ou longues.
+            sets: countedSets,
+            totalReps,
+            topPct1RM: Math.round(topPct),
+            topWeight,
+            ref1RM,
           });
           totalINOL += exerciseTotal;
+
+          for (const part of exercise.exerciseRef.bodyParts) {
+            byMuscle.set(part, (byMuscle.get(part) ?? 0) + exerciseTotal);
+          }
         }
       }
+
+      const muscleINOL = [...byMuscle.entries()]
+        .map(([muscle, v]) => ({ muscle, inol: Math.round(v * 100) / 100 }))
+        .sort((a, b) => b.inol - a.inol);
 
       return {
         date: session.date,
         sessionId: session.id,
         totalINOL: Math.round(totalINOL * 100) / 100,
-        exerciseINOL,
+        exerciseINOL: exerciseINOL.sort((a, b) => b.inol - a.inol),
+        muscleINOL,
       };
     }).filter(s => s.totalINOL > 0);
 
@@ -501,7 +553,7 @@ export const getVolumeLandmarks = async (req, res) => {
         program: { coachId: access.coachId, clientId },
         completedByClient: true,
         isRestDay: false,
-        date: { gte: new Date(startDate), lte: new Date(endDate) },
+        date: dayRange(startDate, endDate),
       },
       include: {
         exercises: {

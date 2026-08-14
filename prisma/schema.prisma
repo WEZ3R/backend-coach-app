@@ -223,7 +223,11 @@ model ClientCoach {
 // Salle de sport (source OpenStreetMap/Overpass)
 model Gym {
   id         String   @id @default(uuid())
-  osmId      String?  @unique // ID Overpass pour déduplication (ex: "node/123456")
+  osmId      String?  @unique // Déprécié : remplacé par source + sourceId. Conservé le temps de la transition.
+  // Provenance de la fiche. `osmId` seul ne permettait pas de dédupliquer une
+  // source non-OSM : deux imports différents ne pouvaient pas coexister.
+  source     String   @default("osm") // "osm" | "sirene"
+  sourceId   String? // "node/123456" pour OSM, le SIRET pour SIRENE
   name       String
   brand      String?  // "Basic-Fit", "Fitness Park"…
   address    String?
@@ -232,12 +236,21 @@ model Gym {
   country    String   @default("FR")
   latitude   Float
   longitude  Float
+  // Position douteuse : plusieurs fiches empilées sur les mêmes coordonnées.
+  // SIRENE donne l'adresse ADMINISTRATIVE de l'établissement, qui pour un réseau
+  // de franchise est souvent le siège du franchiseur — « Kc Euralille » se
+  // retrouvait ainsi à Ventabren, à 900 km de Lille. Ces fiches sont exclues de
+  // la carte par défaut : un point au mauvais endroit est pire qu'un point absent.
+  approxPosition Boolean @default(false)
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt @default(now())
 
   clients ClientGym[]
   coaches CoachGym[]
 
+  @@unique([source, sourceId])
   @@index([city])
+  @@index([postalCode])
   @@map("gyms")
 }
 

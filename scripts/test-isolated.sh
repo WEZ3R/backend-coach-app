@@ -4,7 +4,10 @@
 # Les tests créent de vrais comptes via l'API : sans isolation ils polluent la base de
 # développement (c'est l'origine des comptes *@test.com trouvés dans coaching_app).
 #
-# Usage : npm run test:isolated
+# Usage : npm test  (ou npm run test:isolated, identique)
+#
+# `npm test` pointe sur CE script. Le lanceur brut est `npm run test:raw`, qui refuse
+# de tourner si l'API ciblée n'est pas en NODE_ENV=test (cf. __tests__/helpers.js).
 
 set -euo pipefail
 
@@ -34,7 +37,10 @@ if ! docker exec "$PG_CONTAINER" psql -U postgres -tAc \
 fi
 
 echo "▸ Synchronisation du schéma"
-DATABASE_URL="$DB_URL" npx prisma db push --skip-generate >/dev/null
+# --accept-data-loss : la base de test est jetable et son schéma peut avoir divergé
+# (colonnes supprimées depuis). Le drapeau ne porte QUE sur $DB_URL, construite plus
+# haut à partir de $TEST_DB — jamais sur la base de développement.
+DATABASE_URL="$DB_URL" npx prisma db push --skip-generate --accept-data-loss >/dev/null
 
 echo "▸ Démarrage du serveur de test sur le port ${TEST_PORT}"
 DATABASE_URL="$DB_URL" PORT="$TEST_PORT" NODE_ENV=test node src/server.js >/tmp/fitflow-test-server.log 2>&1 &
@@ -54,4 +60,4 @@ if ! curl -sf -m 2 "http://localhost:${TEST_PORT}/api/health" >/dev/null 2>&1; t
 fi
 
 echo "▸ Exécution des tests"
-TEST_API_URL="http://localhost:${TEST_PORT}/api" npm test
+TEST_API_URL="http://localhost:${TEST_PORT}/api" npm run test:raw

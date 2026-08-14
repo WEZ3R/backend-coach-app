@@ -10,7 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "test": "node --test --test-concurrency=1 __tests__/auth.test.js __tests__/programs.test.js __tests__/sessions.test.js __tests__/stats.test.js __tests__/messages.test.js __tests__/requests.test.js __tests__/goals.test.js __tests__/setCompletions.test.js __tests__/workoutAnalytics.test.js __tests__/authorization.test.js",
+    "test": "bash scripts/test-isolated.sh",
     "test:set-completions": "node --test __tests__/setCompletions.test.js",
     "test:parse": "node --test __tests__/parseSetData.test.js",
     "test:analytics": "node --test __tests__/workoutAnalytics.test.js",
@@ -36,7 +36,12 @@
     "test:db:reset": "RESET_DB=1 bash scripts/test-isolated.sh",
     "test:authz": "node --test __tests__/authorization.test.js",
     "supabase:check": "node scripts/supabase-check.mjs",
-    "supabase:migrate": "bash scripts/supabase-migrate.sh"
+    "supabase:migrate": "bash scripts/supabase-migrate.sh",
+    "import:gyms": "node scripts/import-gyms-sirene.js",
+    "import:gyms:osm": "node scripts/import-gyms-osm.js",
+    "gyms:clean": "node scripts/clean-gyms.js",
+    "test:raw": "node --test --test-concurrency=1 __tests__/auth.test.js __tests__/programs.test.js __tests__/sessions.test.js __tests__/stats.test.js __tests__/messages.test.js __tests__/requests.test.js __tests__/goals.test.js __tests__/setCompletions.test.js __tests__/workoutAnalytics.test.js __tests__/authorization.test.js",
+    "db:purge-tests": "node scripts/purge-test-accounts.js"
   },
   "keywords": [
     "coaching",

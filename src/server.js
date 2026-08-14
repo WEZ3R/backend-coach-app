@@ -85,6 +85,12 @@ app.get('/api/health', (req, res) => {
   res.json({
     success: true,
     message: 'API is running',
+    // `env` est exposé pour que la suite de tests puisse REFUSER de tourner contre
+    // une instance de développement. Les tests créent de vrais comptes : sans ce
+    // garde-fou, ils polluaient la base de dev (plus de 160 comptes @test.com y
+    // avaient été semés). Ce n'est pas une information sensible : elle ne révèle
+    // ni version, ni dépendance, ni configuration.
+    env: config.nodeEnv,
     timestamp: new Date().toISOString(),
   });
 });
