@@ -61,10 +61,11 @@ enum SessionStatus {
 }
 
 enum ExerciseCategory {
-  WARMUP      // Échauffement
-  MAIN        // Exercices principaux (musculation)
-  CARDIO      // Exercices cardio
-  STRETCHING  // Étirements
+  WARMUP        // Échauffement
+  MAIN          // Exercices principaux (musculation, avec charge et répétitions)
+  RENFORCEMENT  // Travail isométrique ou au poids du corps, compté en TEMPS (gainage, chaise)
+  CARDIO        // Exercices cardio
+  STRETCHING    // Étirements
 }
 
 enum MessageType {
@@ -465,6 +466,11 @@ model SetCompletion {
   exercise    Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   setNumber   Int       // Numéro de la série (1, 2, 3, etc.)
   repsAchieved String?  // Nombre de répétitions réalisées
+  // Temps tenu, pour un exercice de catégorie RENFORCEMENT.
+  // Champ SÉPARÉ et non réutilisation de repsAchieved : les calculs de volume et de
+  // 1RM lisent les répétitions, un « 60 » de gainage y serait compté comme
+  // 60 répétitions et gonflerait le volume d'un facteur soixante.
+  durationAchieved String? // Ex: "45s", "1min30"
   weightUsed   String?  // Poids utilisé
   rpe          Float?   // Rate of Perceived Exertion (6-10)
   completed    Boolean  @default(true)

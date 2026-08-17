@@ -7,7 +7,7 @@ import { canAccessExercise, canAccessSession } from '../utils/authorization.js';
  */
 export const toggleSetCompletion = async (req, res) => {
   try {
-    const { exerciseId, setNumber, repsAchieved, weightUsed, rpe } = req.body;
+    const { exerciseId, setNumber, repsAchieved, durationAchieved, weightUsed, rpe } = req.body;
 
     if (!(await canAccessExercise(req.user.id, exerciseId))) {
       return sendError(res, 'Accès non autorisé', 403);
@@ -41,6 +41,7 @@ export const toggleSetCompletion = async (req, res) => {
           exerciseId,
           setNumber,
           repsAchieved,
+          durationAchieved,
           weightUsed,
           ...(rpe != null ? { rpe: parseFloat(rpe) } : {}),
           completed: true,
@@ -59,7 +60,7 @@ export const toggleSetCompletion = async (req, res) => {
  */
 export const updateSetCompletion = async (req, res) => {
   try {
-    const { exerciseId, setNumber, repsAchieved, weightUsed, rpe } = req.body;
+    const { exerciseId, setNumber, repsAchieved, durationAchieved, weightUsed, rpe } = req.body;
     const rpeParsed = rpe != null ? parseFloat(rpe) : undefined;
 
     if (!(await canAccessExercise(req.user.id, exerciseId))) {
@@ -76,6 +77,7 @@ export const updateSetCompletion = async (req, res) => {
       },
       update: {
         repsAchieved,
+        durationAchieved,
         weightUsed,
         ...(rpeParsed != null ? { rpe: rpeParsed } : {}),
       },
@@ -83,6 +85,7 @@ export const updateSetCompletion = async (req, res) => {
         exerciseId,
         setNumber,
         repsAchieved,
+        durationAchieved,
         weightUsed,
         ...(rpeParsed != null ? { rpe: rpeParsed } : {}),
         completed: true,

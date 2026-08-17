@@ -47,7 +47,14 @@ export function fetchCompletedSessionsWithSets(coachId, clientId, startDate, end
     },
     include: {
       exercises: {
-        where: { exerciseRefId: { not: null }, category: 'MAIN' },
+        where: {
+          exerciseRefId: { not: null },
+          // RENFORCEMENT inclus : le gainage est du vrai travail, il doit compter
+          // dans les volume landmarks, qui dénombrent des SÉRIES par muscle.
+          // Les autres calculs l'écartent d'eux-mêmes : sans charge ni répétitions,
+          // le volume, le 1RM et l'INOL n'ont rien à lire.
+          category: { in: ['MAIN', 'RENFORCEMENT'] },
+        },
         include: {
           exerciseRef: { select: { id: true, name: true, bodyParts: true, equipments: true } },
           setCompletions: { where: { completed: true } },

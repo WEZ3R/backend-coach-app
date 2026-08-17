@@ -150,24 +150,24 @@ const CLIENTS = [
 
 const EXERCISES = {
   musculation: [
-    { name: 'Échauffement articulaire',  category: 'WARMUP',     sets: 1, reps: '10min',  restTime: '0' },
+    { name: 'Échauffement articulaire',  category: 'WARMUP',     sets: 1, restTime: '0', duration: '10min' },
     { name: 'Développé couché barre',    category: 'MAIN',       sets: 4, reps: '8-10',   restTime: '3min', weight: '80',  refDbId: 'bench-press-barre-001' },
     { name: 'Squat barre',               category: 'MAIN',       sets: 4, reps: '5',      restTime: '4min', weight: '100', refDbId: 'squat-barre-001' },
     { name: 'Soulevé de terre',          category: 'MAIN',       sets: 3, reps: '5',      restTime: '4min', weight: '120', refDbId: 'deadlift-barre-001' },
     { name: 'Tractions lestées',         category: 'MAIN',       sets: 4, reps: '6-8',    restTime: '2min', weight: '10',  refDbId: 'rowing-barre-001' },
     { name: 'Développé militaire',       category: 'MAIN',       sets: 3, reps: '10-12',  restTime: '2min', weight: '50',  refDbId: 'ohp-barre-001' },
-    { name: 'Gainage planche',           category: 'MAIN',       sets: 3, reps: '60s',    restTime: '1min' },
-    { name: 'Étirements quadriceps',     category: 'STRETCHING', sets: 2, reps: '45s',    restTime: '0' },
-    { name: 'Étirements pectoraux',      category: 'STRETCHING', sets: 2, reps: '45s',    restTime: '0' },
+    { name: 'Gainage planche',           category: 'RENFORCEMENT',       sets: 3, restTime: '1min', duration: '60s' },
+    { name: 'Étirements quadriceps',     category: 'STRETCHING', sets: 2, restTime: '0', duration: '45s' },
+    { name: 'Étirements pectoraux',      category: 'STRETCHING', sets: 2, restTime: '0', duration: '45s' },
   ],
   cardio: [
-    { name: 'Marche rapide 10min',       category: 'WARMUP',     sets: 1, reps: '10min',  restTime: '0',    duration: '10min' },
-    { name: 'Course à pied',             category: 'CARDIO',     sets: 1, reps: '30min',  restTime: '0',    duration: '30min' },
-    { name: 'Vélo elliptique',           category: 'CARDIO',     sets: 1, reps: '20min',  restTime: '0',    duration: '20min' },
-    { name: 'HIIT – Sprints 30/90',      category: 'CARDIO',     sets: 8, reps: '30s',    restTime: '90s' },
-    { name: 'Gainage latéral',           category: 'MAIN',       sets: 3, reps: '45s',    restTime: '1min' },
+    { name: 'Marche rapide 10min',       category: 'WARMUP',     sets: 1, restTime: '0',    duration: '10min' },
+    { name: 'Course à pied',             category: 'CARDIO',     sets: 1, restTime: '0',    duration: '30min' },
+    { name: 'Vélo elliptique',           category: 'CARDIO',     sets: 1, restTime: '0',    duration: '20min' },
+    { name: 'HIIT – Sprints 30/90',      category: 'CARDIO',     sets: 8, restTime: '90s', duration: '30s' },
+    { name: 'Gainage latéral',           category: 'RENFORCEMENT',       sets: 3, restTime: '1min', duration: '45s' },
     { name: 'Montées de genoux',         category: 'WARMUP',     sets: 3, reps: '20',     restTime: '30s' },
-    { name: 'Étirements dynamiques',     category: 'STRETCHING', sets: 1, reps: '10min',  restTime: '0',    duration: '10min' },
+    { name: 'Étirements dynamiques',     category: 'STRETCHING', sets: 1, restTime: '0',    duration: '10min' },
   ],
   crossfit: [
     { name: 'Corde à sauter double under', category: 'WARMUP',  sets: 3, reps: '50',     restTime: '1min' },
@@ -177,24 +177,24 @@ const EXERCISES = {
     { name: 'Tractions kipping',         category: 'MAIN',       sets: 4, reps: '12',     restTime: '2min' },
     { name: 'Kettlebell Swing',          category: 'MAIN',       sets: 4, reps: '15',     restTime: '1min', weight: '24kg' },
     { name: 'Thrusters',                 category: 'MAIN',       sets: 3, reps: '10',     restTime: '2min', weight: '40kg' },
-    { name: 'Foam rolling',              category: 'STRETCHING', sets: 1, reps: '10min',  restTime: '0',    duration: '10min' },
+    { name: 'Foam rolling',              category: 'STRETCHING', sets: 1, restTime: '0',    duration: '10min' },
   ],
   yoga: [
-    { name: 'Salutation au soleil',      category: 'WARMUP',     sets: 3, reps: '5 cycles', restTime: '0' },
-    { name: 'Posture du guerrier I',     category: 'MAIN',       sets: 1, reps: '5min',     restTime: '0',  duration: '5min' },
-    { name: 'Posture du guerrier II',    category: 'MAIN',       sets: 1, reps: '5min',     restTime: '0',  duration: '5min' },
-    { name: 'Posture de l\'arbre',       category: 'MAIN',       sets: 1, reps: '3min',     restTime: '0' },
-    { name: 'Posture du chien tête en bas', category: 'MAIN',   sets: 2, reps: '2min',     restTime: '0' },
-    { name: 'Torsion spinale',           category: 'STRETCHING', sets: 2, reps: '2min',     restTime: '0' },
-    { name: 'Méditation assise',         category: 'STRETCHING', sets: 1, reps: '10min',    restTime: '0',  duration: '10min' },
+    { name: 'Salutation au soleil',      category: 'WARMUP',     sets: 3, restTime: '0', duration: '5min' },
+    { name: 'Posture du guerrier I',     category: 'RENFORCEMENT',       sets: 1, restTime: '0',  duration: '5min' },
+    { name: 'Posture du guerrier II',    category: 'RENFORCEMENT',       sets: 1, restTime: '0',  duration: '5min' },
+    { name: 'Posture de l\'arbre',       category: 'RENFORCEMENT',       sets: 1, restTime: '0', duration: '3min' },
+    { name: 'Posture du chien tête en bas', category: 'RENFORCEMENT',   sets: 2, restTime: '0', duration: '2min' },
+    { name: 'Torsion spinale',           category: 'STRETCHING', sets: 2, restTime: '0', duration: '2min' },
+    { name: 'Méditation assise',         category: 'STRETCHING', sets: 1, restTime: '0',  duration: '10min' },
   ],
   nutrition: [
-    { name: 'Marche active',             category: 'CARDIO',     sets: 1, reps: '45min',  restTime: '0',  duration: '45min' },
+    { name: 'Marche active',             category: 'CARDIO',     sets: 1, restTime: '0',  duration: '45min' },
     { name: 'Squats poids du corps',     category: 'MAIN',       sets: 3, reps: '15',     restTime: '1min' },
     { name: 'Pompes',                    category: 'MAIN',       sets: 3, reps: '10',     restTime: '1min' },
-    { name: 'Vélo stationnaire',         category: 'CARDIO',     sets: 1, reps: '30min',  restTime: '0',  duration: '30min' },
+    { name: 'Vélo stationnaire',         category: 'CARDIO',     sets: 1, restTime: '0',  duration: '30min' },
     { name: 'Fentes avant',              category: 'MAIN',       sets: 3, reps: '12',     restTime: '1min' },
-    { name: 'Étirements dos complet',    category: 'STRETCHING', sets: 2, reps: '1min',   restTime: '0' },
+    { name: 'Étirements dos complet',    category: 'STRETCHING', sets: 2, restTime: '0', duration: '1min' },
   ],
 };
 
@@ -228,7 +228,9 @@ const LIFTS = {
   // Poids de corps : `ratio: null` → weightUsed reste nul. Le volume (kg × reps)
   // les ignore, mais les volume landmarks comptent les SÉRIES : ils apparaissent
   // donc bien dans la section RP, et seulement là. C'est voulu.
-  plank:    { ref: 'ff_abd_04', name: 'Gainage planche',         part: 'WAIST',      ratio: null, reps: '60s',   rest: '60s' },
+  // `timed` → catégorie RENFORCEMENT : le gainage se prescrit en TEMPS, et le temps
+  // tenu va dans durationAchieved, jamais dans repsAchieved.
+  plank:    { ref: 'ff_abd_04', name: 'Gainage planche',         part: 'WAIST',      ratio: null, reps: '60s',   rest: '60s', timed: true },
   crunch:   { ref: 'ff_abd_01', name: 'Crunch classique',        part: 'WAIST',      ratio: null, reps: '20',    rest: '45s' },
 };
 
@@ -635,12 +637,16 @@ async function main() {
             const base = workingWeight(oneRM == null ? null : oneRM * factor, (rLo + rHi) / 2);
 
             exerciseRows.push({
-              name: lift.name, category: 'MAIN', sets, reps: lift.reps,
+              name: lift.name,
+              category: lift.timed ? 'RENFORCEMENT' : 'MAIN',
+              sets,
+              reps: lift.timed ? null : lift.reps,
               weight: base == null ? null : String(roundNearest(base, 2.5)),
-              restTime: lift.rest, duration: null,
+              restTime: lift.rest,
+              duration: lift.timed ? lift.reps : null,
               order: order++,
               exerciseRefId: refMap.get(lift.ref) ?? null,
-              _sets: { rLo, rHi, base },
+              _sets: { rLo, rHi, base, timed: !!lift.timed },
             });
           }
 
@@ -700,7 +706,11 @@ async function main() {
               setRows.push({
                 exerciseId:   created.id,
                 setNumber:    sn,
-                repsAchieved: String(reps),
+                // Un exercice chronométré remplit durationAchieved et LAISSE
+                // repsAchieved vide : le volume et le 1RM lisent les répétitions,
+                // un « 60 » y serait compté comme 60 répétitions.
+                repsAchieved: row._sets.timed ? null : String(reps),
+                durationAchieved: row._sets.timed ? `${randInt(35, 75)}s` : null,
                 weightUsed:   base == null ? null : String(roundNearest(base * rand(0.97, 1.03), 2.5)),
                 completed:    !failed,
               });
