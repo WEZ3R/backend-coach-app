@@ -1,23 +1,18 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
-# Installer les dépendances système pour compiler bcrypt et Prisma
+# Dépendances système pour compiler bcrypt et Prisma
 RUN apk add --no-cache python3 make g++ openssl-dev openssl
 
 WORKDIR /app
 
-# Copier les fichiers package
 COPY package*.json ./
 
-# Installer toutes les dépendances (incluant devDependencies pour nodemon)
+# Toutes les dépendances (dev incluses : nodemon)
 RUN npm install
 
-# Copier le schema Prisma pour générer le client
-COPY prisma ./prisma
+COPY . .
 
-# Générer le client Prisma
 RUN npx prisma generate
-
-# Le reste du code sera monté via volume pour le hot-reload
 
 EXPOSE 5001
 

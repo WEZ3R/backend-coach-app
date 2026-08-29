@@ -1,5 +1,12 @@
 import express from 'express';
-import { register, login, getMe, updateProfile } from '../controllers/authController.js';
+import {
+  register,
+  login,
+  getMe,
+  updateProfile,
+  exportMyData,
+  deleteAccount,
+} from '../controllers/authController.js';
 import { authenticate } from '../middlewares/auth.js';
 import { authLimiter } from '../middlewares/rateLimit.js';
 
@@ -17,5 +24,10 @@ router.post('/login', authLimiter, login);
 // Routes protégées
 router.get('/me', authenticate, getMe);
 router.put('/profile', authenticate, updateProfile);
+
+// RGPD. Ces deux routes n'agissent jamais que sur req.user.id : il n'existe aucun
+// moyen, même pour un coach, de demander l'export ou la suppression du compte d'autrui.
+router.get('/me/export', authenticate, exportMyData);
+router.delete('/me', authenticate, deleteAccount);
 
 export default router;

@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { saveUpload } from '../services/fileStorage.js';
 
 // Récupérer tous les clients d'un coach (y compris les demandes en attente)
 export const getCoachClients = async (req, res) => {
@@ -264,10 +265,11 @@ export const updateMyClientProfile = async (req, res) => {
       return sendError(res, 'Profil client non trouvé', 404);
     }
 
-    // Gérer l'upload de la photo de profil si présente
+    // Gérer l'upload de la photo de profil si présente.
+    // saveUpload décide de la destination selon STORAGE_DRIVER et renvoie l'URL à stocker.
     let profilePicture = clientProfile.profilePicture;
     if (req.file) {
-      profilePicture = `/uploads/${req.file.filename}`;
+      profilePicture = await saveUpload(req.file);
     }
 
     // Mettre à jour le profil

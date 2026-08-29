@@ -260,3 +260,98 @@ export const updateProfile = async (req, res) => {
     sendError(res, `Erreur lors de la mise à jour du profil: ${error.message}`, 500);
   }
 };
+
+/**
+ * Export des données personnelles — RGPD, droit d'accès et portabilité (art. 15 et 20).
+ *
+ * Renvoie en un seul JSON tout ce que la plateforme détient sur l'appelant. Le mot de
+ * passe haché en est exclu : il n'est pas une donnée « fournie par la personne » au sens
+ * de l'article 20, et l'exporter n'aurait d'autre effet que d'exposer une empreinte à
+ * attaquer hors ligne.
+ *
+ * Les conversations sont incluses parce qu'elles concernent l'appelant, mais elles
+ * contiennent aussi les messages de son interlocuteur : c'est la limite reconnue de la
+ * portabilité sur des données relationnelles.
+ */
+export const exportMyData = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, email: true, role: true, firstName: true, lastName: true,
+        phone: true, birthDate: true, createdAt: true,
+        notifications: true,
+        // specialties est un tableau d'enum porté par la table, pas une relation :
+        // il est déjà présent dans le profil sans include.
+        coachProfile: { include: { gyms: true, reviews: true } },
+        clientProfile: {
+          include: {
+            gyms: true, trainingSpots: true, coaches: true,
+            stats: true, meals: true, reviews: true,
+          },
+        },
+      },
+    });
+
+    if (!user) return sendError(res, 'Utilisateur introuvable', 404);
+
+    const profileId = user.coachProfile?.id ?? user.clientProfile?.id;
+    const messages = profileId
+      ? await prisma.message.findMany({
+          where: user.role === 'COACH' ? { coachId: profileId } : { clientId: profileId },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
+
+    const appointments = profileId
+      ? await prisma.appointment.findMany({
+          where: user.role === 'COACH' ? { coachId: profileId } : { clientId: profileId },
+          orderBy: { startAt: 'asc' },
+        })
+      : [];
+
+    return sendSuccess(
+      res,
+      { exportedAt: new Date().toISOString(), user, messages, appointments },
+      'Export des données personnelles'
+    );
+  } catch (error) {
+    console.error('exportMyData error:', error);
+    return sendError(res, "Échec de l'export des données", 500);
+  }
+};
+
+/**
+ * Suppression du compte — RGPD, droit à l'effacement (art. 17).
+ *
+ * Le mot de passe est redemandé : un jeton valide suffit à agir au nom de la personne,
+ * et cette action est irréversible. C'est la même précaution que pour un changement
+ * d'email, appliquée à une opération bien plus destructrice.
+ *
+ * L'effacement des données liées repose sur les `onDelete: Cascade` du schéma : profil,
+ * relations coach-client, programmes, séances, validations de séries, statistiques,
+ * repas, messages et notifications disparaissent avec l'utilisateur.
+ */
+export const deleteAccount = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return sendError(res, 'Mot de passe requis pour confirmer la suppression', 400);
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return sendError(res, 'Utilisateur introuvable', 404);
+
+    const passwordMatch = await comparePassword(password, user.password);
+    if (!passwordMatch) return sendError(res, 'Mot de passe incorrect', 401);
+
+    await prisma.user.delete({ where: { id: user.id } });
+
+    return sendSuccess(res, null, 'Compte et données associées supprimés');
+  } catch (error) {
+    console.error('deleteAccount error:', error);
+    return sendError(res, 'Échec de la suppression du compte', 500);
+  }
+};

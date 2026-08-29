@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { config } from './config/env.js';
 import prisma from './config/database.js';
 import { apiLimiter } from './middlewares/rateLimit.js';
@@ -39,6 +40,11 @@ if (config.isProduction) app.set('trust proxy', 1);
 // En-têtes de sécurité. crossOriginResourcePolicy est désactivé car /uploads sert
 // des images consommées depuis une autre origine (le dashboard).
 app.use(helmet({ crossOriginResourcePolicy: false }));
+
+// Compression des réponses. Les charges utiles de l'API sont du JSON très répétitif
+// (listes de séances, d'exercices, de messages) : gzip y gagne beaucoup, pour un coût
+// CPU négligeable. Posé avant les routes pour couvrir toutes les réponses.
+app.use(compression());
 
 // Middlewares globaux
 app.use(cors({

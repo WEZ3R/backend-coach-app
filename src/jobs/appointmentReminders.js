@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import prisma from '../config/database.js';
+import { invalidateManyUnreadCounts } from '../services/notificationCache.js';
 
 // Seuls les champs réellement utilisés ici — évite de charger le hash du mot de passe.
 const USER_PUBLIC = { select: { id: true, firstName: true, lastName: true } };
@@ -114,6 +115,9 @@ cron.schedule('*/5 * * * *', async () => {
             data,
           })),
         });
+        // Le badge de ces deux personnes doit refléter le rappel sans attendre
+        // l'expiration de la clé.
+        await invalidateManyUnreadCounts(recipients.map((r) => r.userId));
       }
 
       await prisma.appointment.update({

@@ -1,28 +1,37 @@
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { config } from '../config/env.js';
-import fs from 'fs';
+import { randomUUID } from 'crypto';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Stockage en mémoire, et non sur disque : c'est src/services/fileStorage.js qui décide
+// ensuite de la destination réelle — disque local en développement, bucket objet en
+// production. Écrire d'abord sur disque pour re-lire et ré-envoyer serait un aller-retour
+// inutile, et laisserait des fichiers orphelins si le dépôt distant échouait.
+// La limite de taille (5 Mo par défaut) borne ce qui transite en mémoire.
+const storage = multer.memoryStorage();
 
-// Créer le dossier uploads s'il n'existe pas
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+/**
+ * Nomme le fichier avant qu'il ne soit stocké.
+ *
+ * Le bucket est public et /uploads est servi sans authentification : les balises <img> du
+ * dashboard et du mobile ne peuvent pas porter d'en-tête Authorization. Le nom du fichier
+ * est donc le seul secret qui protège la ressource, et il doit être imprévisible.
+ * Math.random() ne convient pas — il n'est pas cryptographique et sa sortie est
+ * prédictible à partir de quelques tirages. randomUUID() l'est.
+ *
+ * memoryStorage ne renseignant pas `filename`, on le pose ici pour que fileStorage.js
+ * puisse s'en servir quel que soit le pilote.
+ */
+const nommer = (req, res, next) => {
+  const baptiser = (file) => {
+    file.filename = `${file.fieldname}-${randomUUID()}${path.extname(file.originalname)}`;
+  };
 
-// Configuration du stockage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  },
-});
+  if (req.file) baptiser(req.file);
+  if (Array.isArray(req.files)) req.files.forEach(baptiser);
+
+  next();
+};
 
 // Filtre pour les types de fichiers
 const fileFilter = (req, file, cb) => {
@@ -37,14 +46,23 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configuration de multer
-export const upload = multer({
+const multerInstance = multer({
   storage: storage,
   limits: {
     fileSize: config.upload.maxFileSize,
   },
   fileFilter: fileFilter,
 });
+
+/**
+ * `upload.single(champ)` renvoie la paire [réception, nommage] plutôt qu'un middleware
+ * seul. Express accepte un tableau de middlewares, ce qui permet de garder les routes
+ * inchangées tout en garantissant qu'aucun fichier ne parvienne aux controllers sans nom.
+ */
+export const upload = {
+  single: (champ) => [multerInstance.single(champ), nommer],
+  array: (champ, max) => [multerInstance.array(champ, max), nommer],
+};
 
 // Middleware pour gérer les erreurs d'upload
 export const handleUploadError = (err, req, res, next) => {

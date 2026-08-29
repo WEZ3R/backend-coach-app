@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { invalidateUnreadCount } from '../services/notificationCache.js';
 import rrulePkg from 'rrule';
 const { RRule } = rrulePkg;
 
@@ -129,8 +130,83 @@ export const createAppointment = async (req, res) => {
     }
 
     if (rrule) {
-      // Création d'une série récurrente (COACH uniquement, déjà vérifié)
-      const parent = await prisma.appointment.create({
+      // Création d'une série récurrente (COACH uniquement, déjà vérifié).
+      //
+      // Les trois écritures — RDV racine, occurrences, message de proposition —
+      // forment un tout : une série sans ses occurrences, ou une racine sans son
+      // message, laisse l'agenda et la conversation dans un état incohérent qu'aucun
+      // écran ne permet de rattraper. Elles sont donc atomiques.
+      const { parent, children, message } = await prisma.$transaction(async (tx) => {
+        const root = await tx.appointment.create({
+          data: {
+            title,
+            coachId: coachProfile.id,
+            ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
+            startAt: startDate,
+            endAt: endDate,
+            durationMinutes,
+            locationType,
+            ...(locationDetail ? { locationDetail } : {}),
+            ...(meetingType ? { meetingType } : {}),
+            status,
+            rrule,
+          },
+        });
+
+        // Générer les occurrences via rrule, limitées à 1 an
+        const rruleStr = rrule.startsWith('RRULE:') ? rrule.slice(6) : rrule;
+        const rule = new RRule({ ...RRule.parseString(rruleStr), dtstart: startDate });
+        const oneYearLater = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
+        const dates = rule.all((date) => date <= oneYearLater);
+
+        if (dates.length > 0) {
+          await tx.appointment.createMany({
+            data: dates.map((date) => ({
+              title,
+              coachId: coachProfile.id,
+              ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
+              startAt: date,
+              endAt: new Date(date.getTime() + durationMinutes * 60000),
+              durationMinutes,
+              locationType,
+              ...(locationDetail ? { locationDetail } : {}),
+              ...(meetingType ? { meetingType } : {}),
+              status,
+              parentId: root.id,
+            })),
+          });
+        }
+
+        const proposal = resolvedClientId
+          ? await tx.message.create({
+              data: {
+                coachId: coachProfile.id,
+                clientId: resolvedClientId,
+                content: `Nouvelle proposition de RDV : « ${title} » le ${startDate.toLocaleDateString('fr-FR')}.`,
+                type: 'APPOINTMENT_PROPOSAL',
+                isSentByCoach,
+                appointmentId: root.id,
+              },
+            })
+          : null;
+
+        const occurrences = await tx.appointment.findMany({ where: { parentId: root.id } });
+
+        return { parent: root, children: occurrences, message: proposal };
+      });
+
+      return sendSuccess(res, { appointment: parent, children, message }, 'Série de RDV créée', 201);
+    }
+
+    // Création d'un RDV ponctuel.
+    //
+    // Le RDV et son message vont par paire : c'est le message qui porte les boutons
+    // Accepter / Refuser dans la conversation, et c'est lui qui indique qui a proposé
+    // (isSentByCoach), information dont dépend la règle de confirmation. Sans
+    // transaction, un échec sur la seconde écriture laisserait une proposition
+    // orpheline — existante en base, invisible dans le fil, donc inacceptable.
+    const { appointment, message } = await prisma.$transaction(async (tx) => {
+      const created = await tx.appointment.create({
         data: {
           title,
           coachId: coachProfile.id,
@@ -142,86 +218,24 @@ export const createAppointment = async (req, res) => {
           ...(locationDetail ? { locationDetail } : {}),
           ...(meetingType ? { meetingType } : {}),
           status,
-          rrule,
         },
       });
 
-      // Générer les occurrences via rrule, limitées à 1 an
-      const rruleStr = rrule.startsWith('RRULE:') ? rrule.slice(6) : rrule;
-      const rule = new RRule({ ...RRule.parseString(rruleStr), dtstart: startDate });
-      const oneYearLater = new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000);
-      const dates = rule.all((date) => date <= oneYearLater);
+      const proposal = resolvedClientId
+        ? await tx.message.create({
+            data: {
+              coachId: coachProfile.id,
+              clientId: resolvedClientId,
+              content: `Nouvelle proposition de RDV : « ${title} » le ${startDate.toLocaleDateString('fr-FR')}.`,
+              type: 'APPOINTMENT_PROPOSAL',
+              isSentByCoach,
+              appointmentId: created.id,
+            },
+          })
+        : null;
 
-      if (dates.length > 0) {
-        await prisma.appointment.createMany({
-          data: dates.map((date) => ({
-            title,
-            coachId: coachProfile.id,
-            ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
-            startAt: date,
-            endAt: new Date(date.getTime() + durationMinutes * 60000),
-            durationMinutes,
-            locationType,
-            ...(locationDetail ? { locationDetail } : {}),
-            ...(meetingType ? { meetingType } : {}),
-            status,
-            parentId: parent.id,
-          })),
-        });
-      }
-
-      // Créer le message de proposition si clientId présent
-      let message = null;
-      if (resolvedClientId) {
-        message = await prisma.message.create({
-          data: {
-            coachId: coachProfile.id,
-            clientId: resolvedClientId,
-            content: `Nouvelle proposition de RDV : « ${title} » le ${startDate.toLocaleDateString('fr-FR')}.`,
-            type: 'APPOINTMENT_PROPOSAL',
-            isSentByCoach,
-            appointmentId: parent.id,
-          },
-        });
-      }
-
-      const children = await prisma.appointment.findMany({
-        where: { parentId: parent.id },
-      });
-
-      return sendSuccess(res, { appointment: parent, children, message }, 'Série de RDV créée', 201);
-    }
-
-    // Création d'un RDV ponctuel
-    const appointment = await prisma.appointment.create({
-      data: {
-        title,
-        coachId: coachProfile.id,
-        ...(resolvedClientId ? { clientId: resolvedClientId } : {}),
-        startAt: startDate,
-        endAt: endDate,
-        durationMinutes,
-        locationType,
-        ...(locationDetail ? { locationDetail } : {}),
-        ...(meetingType ? { meetingType } : {}),
-        status,
-      },
+      return { appointment: created, message: proposal };
     });
-
-    // Créer le message de proposition si clientId présent
-    let message = null;
-    if (resolvedClientId) {
-      message = await prisma.message.create({
-        data: {
-          coachId: coachProfile.id,
-          clientId: resolvedClientId,
-          content: `Nouvelle proposition de RDV : « ${title} » le ${startDate.toLocaleDateString('fr-FR')}.`,
-          type: 'APPOINTMENT_PROPOSAL',
-          isSentByCoach,
-          appointmentId: appointment.id,
-        },
-      });
-    }
 
     sendSuccess(res, { appointment, message }, 'RDV créé', 201);
   } catch (error) {
@@ -483,6 +497,8 @@ export const cancelAppointment = async (req, res) => {
             data: { appointmentId: appointment.id, title: appointment.title, startAt: appointment.startAt },
           },
         });
+        // Le compteur de non-lues de ce client vient de changer.
+        await invalidateUnreadCount(clientProfileForNotif.userId);
       }
     }
 
@@ -556,6 +572,8 @@ export const updateAppointment = async (req, res) => {
             data: { appointmentId: id, changes },
           },
         });
+        // Le compteur de non-lues de ce client vient de changer.
+        await invalidateUnreadCount(clientProfileForNotif.userId);
       }
     }
 
@@ -599,6 +617,8 @@ export const deleteAppointment = async (req, res) => {
             data: { appointmentId: appointment.id, title: appointment.title, startAt: appointment.startAt },
           },
         });
+        // Le compteur de non-lues de ce client vient de changer.
+        await invalidateUnreadCount(clientProfileForNotif.userId);
       }
     }
 

@@ -1,5 +1,10 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import {
+  getCachedUnreadCount,
+  setCachedUnreadCount,
+  invalidateUnreadCount,
+} from '../services/notificationCache.js';
 
 // GET /api/notifications
 export const getNotifications = async (req, res) => {
@@ -17,12 +22,23 @@ export const getNotifications = async (req, res) => {
 };
 
 // GET /api/notifications/unread-count
+//
+// Endpoint le plus sollicité de l'API : chaque application mobile ouverte l'appelle
+// toutes les 30 secondes. Il est servi par un cache Redis en lecture au travers —
+// PostgreSQL n'est interrogé que sur défaut de cache ou si Redis est indisponible.
 export const getUnreadCount = async (req, res) => {
   try {
+    const userId = req.user.id;
+
+    const cached = await getCachedUnreadCount(userId);
+    if (cached !== null) return sendSuccess(res, { count: cached, cached: true });
+
     const count = await prisma.notification.count({
-      where: { userId: req.user.id, isRead: false },
+      where: { userId, isRead: false },
     });
-    sendSuccess(res, { count });
+    await setCachedUnreadCount(userId, count);
+
+    sendSuccess(res, { count, cached: false });
   } catch (error) {
     console.error('getUnreadCount error:', error);
     sendError(res, 'Échec', 500);
@@ -37,6 +53,8 @@ export const markAsRead = async (req, res) => {
       where: { id, userId: req.user.id },
       data: { isRead: true },
     });
+    // Le compteur vient de changer : la valeur en cache est fausse.
+    await invalidateUnreadCount(req.user.id);
     sendSuccess(res, null, 'Notification lue');
   } catch (error) {
     console.error('markAsRead error:', error);
@@ -51,6 +69,7 @@ export const markAllAsRead = async (req, res) => {
       where: { userId: req.user.id, isRead: false },
       data: { isRead: true },
     });
+    await invalidateUnreadCount(req.user.id);
     sendSuccess(res, null, 'Toutes les notifications lues');
   } catch (error) {
     console.error('markAllAsRead error:', error);

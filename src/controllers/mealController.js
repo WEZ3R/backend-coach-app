@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { saveUpload } from '../services/fileStorage.js';
 import { canAccessClient } from '../utils/authorization.js';
 
 /**
@@ -13,8 +14,8 @@ export const createMeal = async (req, res) => {
       return sendError(res, 'Accès non autorisé', 403);
     }
 
-    // Si une image est uploadée
-    const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    // Si une image est uploadée. saveUpload renvoie null si req.file est absent.
+    const photoUrl = await saveUpload(req.file);
 
     const meal = await prisma.meal.create({
       data: {

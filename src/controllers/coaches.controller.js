@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
+import { saveUpload } from '../services/fileStorage.js';
 
 /**
  * Récupérer tous les coachs publics pour la recherche
@@ -147,7 +148,7 @@ export const updateMyProfile = async (req, res) => {
     // Gérer l'upload de la photo de profil si présente
     let profilePicture = coachProfile.profilePicture;
     if (req.file) {
-      profilePicture = `/uploads/${req.file.filename}`;
+      profilePicture = await saveUpload(req.file);
     }
 
     // Convertir isRemote en booléen si c'est une chaîne

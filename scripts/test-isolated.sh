@@ -14,9 +14,23 @@ set -euo pipefail
 TEST_DB="${TEST_DB:-coaching_app_test}"
 TEST_PORT="${TEST_PORT:-5002}"
 PG_CONTAINER="${PG_CONTAINER:-fitflow-db}"
-DB_URL="postgresql://postgres:postgres@localhost:5432/${TEST_DB}"
+PG_HOST="${PG_HOST:-localhost}"
+PG_PORT="${PG_PORT:-5432}"
+DB_URL="postgresql://postgres:postgres@${PG_HOST}:${PG_PORT}/${TEST_DB}"
 
 cd "$(dirname "$0")/.."
+
+# En local, PostgreSQL tourne dans le conteneur $PG_CONTAINER et on l'administre par
+# `docker exec`. En intégration continue, c'est un service container GitHub : le
+# conteneur nommé n'existe pas, mais le serveur est joignable sur $PG_HOST et le client
+# psql est installé sur le runner. On choisit donc la voie disponible.
+if docker inspect "$PG_CONTAINER" >/dev/null 2>&1; then
+  echo "▸ PostgreSQL : conteneur ${PG_CONTAINER}"
+  psql_admin() { docker exec "$PG_CONTAINER" psql -U postgres "$@"; }
+else
+  echo "▸ PostgreSQL : serveur ${PG_HOST}:${PG_PORT}"
+  psql_admin() { PGPASSWORD=postgres psql -h "$PG_HOST" -p "$PG_PORT" -U postgres "$@"; }
+fi
 
 echo "▸ Base de test : ${TEST_DB}"
 
@@ -24,16 +38,16 @@ if [ "${RESET_DB:-0}" = "1" ]; then
   # Un serveur de test laissé ouvert garde des connexions et bloque le DROP. On les coupe,
   # en ciblant strictement la base de test — jamais la base de développement.
   echo "  fermeture des connexions puis suppression…"
-  docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+  psql_admin -tAc \
     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
      WHERE datname='${TEST_DB}' AND pid <> pg_backend_pid();" >/dev/null
-  docker exec "$PG_CONTAINER" psql -U postgres -c "DROP DATABASE IF EXISTS ${TEST_DB};"
+  psql_admin -c "DROP DATABASE IF EXISTS ${TEST_DB};"
 fi
 
-if ! docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+if ! psql_admin -tAc \
       "SELECT 1 FROM pg_database WHERE datname='${TEST_DB}'" | grep -q 1; then
   echo "  création…"
-  docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE ${TEST_DB} OWNER postgres;"
+  psql_admin -c "CREATE DATABASE ${TEST_DB} OWNER postgres;"
 fi
 
 echo "▸ Synchronisation du schéma"

@@ -51,7 +51,14 @@ export const config = {
   },
 
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    // Plusieurs origines séparées par des virgules. Un déploiement en a rarement une
+    // seule : le domaine définitif, l'URL de repli de l'hébergeur, et éventuellement
+    // une préproduction. Les déclarer toutes évite de bloquer le dashboard au moindre
+    // changement d'adresse — sans pour autant ouvrir le CORS à tout le monde.
+    origin: (process.env.FRONTEND_URL || 'http://localhost:3000')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
   },
 };
 

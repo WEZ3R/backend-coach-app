@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # openssl est requis par le moteur de requêtes Prisma.
 # python3/make/g++ servent de filet : si node-gyp-build ne trouve pas de binaire
