@@ -54,10 +54,15 @@ echo "▸ Synchronisation du schéma"
 # --accept-data-loss : la base de test est jetable et son schéma peut avoir divergé
 # (colonnes supprimées depuis). Le drapeau ne porte QUE sur $DB_URL, construite plus
 # haut à partir de $TEST_DB — jamais sur la base de développement.
-DATABASE_URL="$DB_URL" npx prisma db push --skip-generate --accept-data-loss >/dev/null
+# DIRECT_URL doit accompagner DATABASE_URL : dès que le schéma déclare `directUrl`,
+# c'est CETTE URL que `prisma db push` utilise pour se connecter. Sans elle, le schéma
+# partait dans la base pointée par l'environnement — en intégration continue, la base
+# applicative — et les tests trouvaient une base de test vide : « The table
+# `public.users` does not exist in the current database ».
+DATABASE_URL="$DB_URL" DIRECT_URL="$DB_URL" npx prisma db push --skip-generate --accept-data-loss >/dev/null
 
 echo "▸ Démarrage du serveur de test sur le port ${TEST_PORT}"
-DATABASE_URL="$DB_URL" PORT="$TEST_PORT" NODE_ENV=test node src/server.js >/tmp/fitflow-test-server.log 2>&1 &
+DATABASE_URL="$DB_URL" DIRECT_URL="$DB_URL" PORT="$TEST_PORT" NODE_ENV=test node src/server.js >/tmp/fitflow-test-server.log 2>&1 &
 SERVER_PID=$!
 # Arrête le serveur quoi qu'il arrive (succès, échec, interruption)
 trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
