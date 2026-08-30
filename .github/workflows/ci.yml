@@ -28,6 +28,10 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/coaching_app
+      # Le schéma déclare `directUrl` pour Supabase, dont le pooler en mode
+      # transaction ne supporte pas les migrations. Prisma exige la variable même
+      # quand elle ne sert pas : ici les deux pointent sur le même serveur.
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/coaching_app
       JWT_SECRET: ci-test-secret-key
       NODE_ENV: test
 
@@ -38,7 +42,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Aligné sur l'image de production : le SDK Supabase exige un WebSocket
+          # natif, absent de Node 20.
+          node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
 
