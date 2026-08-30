@@ -103,8 +103,15 @@ export const getClientStats = async (req, res) => {
 
     const coachId = coachProfile.id;
 
-    // Si clientIds est fourni, le parser, sinon récupérer tous les clients du coach
-    let whereClause = { coachId: coachId };
+    // Le lien coach-client passe par la table de liaison `ClientCoach` depuis le
+    // passage au multi-coach (partie 7.3 du dossier). Le champ hérité
+    // `clientProfile.coachId` n'est plus alimenté : filtrer dessus ne renvoyait
+    // aucun client, et cet écran répondait « Aucun client trouvé » en 404 alors
+    // que la liste de gauche — qui interroge bien la table de liaison — en
+    // affichait cinq.
+    let whereClause = {
+      coaches: { some: { coachId: coachId, isActive: true } },
+    };
 
     if (clientIds) {
       const clientIdArray = Array.isArray(clientIds) ? clientIds : [clientIds];
