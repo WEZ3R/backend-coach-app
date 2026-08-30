@@ -20,6 +20,54 @@ datasource db {
 enum UserRole {
   COACH
   CLIENT
+  // Ajouté pour la modération. L'inscription publique refuse ce rôle
+  // (cf. authController.register) : un administrateur se crée en ligne de commande.
+  ADMIN
+}
+
+// Un compte n'est pas seulement actif ou supprimé : entre les deux, il y a la
+// suspension — réversible — et la suppression programmée, qui laisse un délai de recours.
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_DELETION
+}
+
+enum ReportReason {
+  HARASSMENT
+  SPAM
+  INAPPROPRIATE_CONTENT
+  FAKE_PROFILE
+  OTHER
+}
+
+// Le contexte d'où part le signalement : il détermine ce que l'administrateur
+// pourra consulter.
+enum ReportContext {
+  PROFILE
+  CONVERSATION
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  ACTIONED
+  DISMISSED
+}
+
+enum ModerationActionType {
+  SUSPEND
+  UNSUSPEND
+  SCHEDULE_DELETION
+  CANCEL_DELETION
+  DELETE
+  DISMISS_REPORT
+}
+
+enum AppealStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
 }
 
 enum ClientLevel {
@@ -107,12 +155,128 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  // ─── Modération ───────────────────────────────────────────────────────────
+  // Le motif et l'échéance ne sont pas décoratifs : sans eux, une sanction ne
+  // peut être ni comprise ni contestée par la personne qui la subit.
+  status            UserStatus @default(ACTIVE)
+  suspendedAt       DateTime?
+  suspendedUntil    DateTime?  // null sur une suspension sans terme
+  suspensionReason  String?
+  scheduledDeletionAt DateTime? // suppression différée : laisse le délai de recours
+
   // Relations
   coachProfile  CoachProfile?
   clientProfile ClientProfile?
   notifications Notification[]
 
+  reportsMade      Report[]           @relation("Reporter")
+  reportsReceived  Report[]           @relation("ReportedUser")
+  moderationActs   ModerationAction[] @relation("ModeratorActions")
+  sanctions        ModerationAction[] @relation("SanctionedUser")
+  accessLogs       ModerationAccessLog[]
+  appeals          Appeal[]           @relation("Appellant")
+  appealsReviewed  Appeal[]           @relation("AppealReviewer")
+
+  @@index([status, scheduledDeletionAt])
   @@map("users")
+}
+
+// ─── MODÉRATION ─────────────────────────────────────────────────────────────
+
+/// Signalement d'un utilisateur, depuis son profil ou depuis une conversation.
+model Report {
+  id          String        @id @default(uuid())
+
+  // SetNull et non Cascade : si le signalant supprime son compte, le signalement
+  // doit survivre. L'effacer reviendrait à faire disparaître l'historique de
+  // modération d'un tiers, et à offrir un moyen d'annuler un signalement gênant.
+  reporterId  String?
+  reporter    User?         @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+
+  reportedId  String
+  reported    User          @relation("ReportedUser", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  reason      ReportReason
+  description String?       // précision libre, facultative
+  context     ReportContext
+  messageId   String?       // message visé, quand le signalement part d'une conversation
+
+  status      ReportStatus  @default(PENDING)
+  reviewedAt  DateTime?
+  resolution  String?       // motif de la décision, obligatoire à la clôture
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  accessLogs  ModerationAccessLog[]
+
+  @@index([status, createdAt])
+  @@index([reportedId])
+  @@map("reports")
+}
+
+/// Journal des décisions de modération — article 5.2 : il faut pouvoir démontrer
+/// qui a décidé quoi, quand, et pour quel motif.
+model ModerationAction {
+  id         String               @id @default(uuid())
+
+  // L'administrateur peut lui-même être supprimé un jour ; la trace de sa décision
+  // ne doit pas disparaître avec lui.
+  moderatorId String?
+  moderator   User?               @relation("ModeratorActions", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  targetId   String?
+  target     User?                @relation("SanctionedUser", fields: [targetId], references: [id], onDelete: SetNull)
+
+  // Conservé en clair : après suppression du compte, targetId devient null et
+  // cette valeur reste le seul repère permettant de justifier l'action.
+  targetLabel String?
+
+  type       ModerationActionType
+  reason     String               // jamais facultatif
+  metadata   Json?                // durée de suspension, date de suppression prévue…
+  createdAt  DateTime             @default(now())
+
+  @@index([targetId, createdAt])
+  @@map("moderation_actions")
+}
+
+/// Journal des consultations de contenu signalé. Lire une correspondance privée
+/// est un traitement en soi : il laisse une trace, comme tout accès à des
+/// données sensibles.
+model ModerationAccessLog {
+  id         String   @id @default(uuid())
+  moderatorId String?
+  moderator  User?    @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
+  reportId   String?
+  report     Report?  @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  scope      String   // "REPORT_DETAIL" | "CONVERSATION" | "USER_FILE"
+  createdAt  DateTime @default(now())
+
+  @@index([reportId])
+  @@index([createdAt])
+  @@map("moderation_access_logs")
+}
+
+/// Recours contre une sanction — article 22 : une décision produisant des effets
+/// juridiques doit pouvoir être contestée devant un humain.
+model Appeal {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation("Appellant", fields: [userId], references: [id], onDelete: Cascade)
+  message     String
+  status      AppealStatus @default(PENDING)
+
+  reviewedById String?
+  reviewedBy   User?       @relation("AppealReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt   DateTime?
+  decision     String?     // motif de la réponse, obligatoire à la clôture
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@map("appeals")
 }
 
 // Notifications système
@@ -257,6 +421,11 @@ model Gym {
   @@unique([source, sourceId])
   @@index([city])
   @@index([postalCode])
+  // La carte exclut par défaut les fiches à position douteuse : ce filtre porte
+  // sur chaque requête de recherche. L'index avait été créé par la migration
+  // gym_approx_position puis retiré du schéma sans migration ; on le redéclare
+  // pour que schéma et base cessent de diverger.
+  @@index([approxPosition])
   @@map("gyms")
 }
 

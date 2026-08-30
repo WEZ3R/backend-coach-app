@@ -61,6 +61,10 @@ export const getCoachProfile = async (req, res) => {
       include: {
         user: {
           select: {
+            // L'identifiant est nécessaire pour signaler ce coach : le signalement
+            // vise un User, pas un profil. C'est un UUID sans caractère sensible,
+            // et l'email reste exclu de cette vue publique.
+            id: true,
             firstName: true,
             lastName: true,
             email: false,

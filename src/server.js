@@ -29,7 +29,11 @@ import gymRoutes from './routes/gyms.js';
 import notificationRoutes from './routes/notifications.js';
 import sessionTemplateRoutes from './routes/sessionTemplates.js';
 import nutritionRoutes from './routes/nutrition.js';
+import reportRoutes from './routes/reports.js';
+import appealRoutes from './routes/appeals.js';
+import adminRoutes from './routes/admin.js';
 import './jobs/appointmentReminders.js';
+import './jobs/moderationJobs.js';
 
 const app = express();
 
@@ -64,6 +68,11 @@ app.use('/api', apiLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
+// Modération. /api/appeals reste joignable par un compte suspendu : son middleware
+// d'authentification ne contrôle pas le statut (cf. middlewares/auth.js).
+app.use('/api/reports', reportRoutes);
+app.use('/api/appeals', appealRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/programs', programRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/meals', mealRoutes);

@@ -74,4 +74,8 @@ if ! curl -sf -m 2 "http://localhost:${TEST_PORT}/api/health" >/dev/null 2>&1; t
 fi
 
 echo "▸ Exécution des tests"
-TEST_API_URL="http://localhost:${TEST_PORT}/api" npm run test:raw
+# DATABASE_URL est transmis aux tests, et pas seulement au serveur : certains
+# scénarios doivent vérifier en base ce que l'API ne renvoie pas — l'écriture
+# d'un journal de modération, par exemple. Ils pointent ainsi sur la base de
+# TEST, jamais sur celle de développement.
+TEST_API_URL="http://localhost:${TEST_PORT}/api" DATABASE_URL="$DB_URL" DIRECT_URL="$DB_URL" npm run test:raw

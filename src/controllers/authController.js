@@ -132,6 +132,54 @@ export const login = async (req, res) => {
       return sendError(res, 'Email ou mot de passe incorrect', 401);
     }
 
+    // Statut de modération. Le contrôle a lieu APRÈS la vérification du mot de passe :
+    // annoncer « ce compte est suspendu » à qui ne connaît pas le mot de passe
+    // révélerait à la fois l'existence du compte et sa situation.
+    //
+    // Un jeton est tout de même émis pour un compte sanctionné : sans lui, la personne
+    // ne pourrait pas déposer de recours. Il ne donne accès qu'à /api/appeals, les
+    // autres routes étant fermées par le middleware d'authentification.
+    if (user.status === 'SUSPENDED' || user.status === 'PENDING_DELETION') {
+      // Une suppression programmée n'a pas de terme : seule une suspension expire.
+      const echu = user.status === 'SUSPENDED'
+        && user.suspendedUntil
+        && new Date(user.suspendedUntil) <= new Date();
+
+      if (echu) {
+        // Le statut est remis à jour ICI, et pas seulement au premier appel authentifié :
+        // laisser un compte marqué SUSPENDED alors qu'il peut se connecter afficherait
+        // une sanction fantôme sur la fiche de modération.
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            status: 'ACTIVE',
+            suspendedAt: null,
+            suspendedUntil: null,
+            suspensionReason: null,
+          },
+        });
+        user.status = 'ACTIVE';
+      }
+
+      if (!echu) {
+        return res.status(403).json({
+          success: false,
+          message: user.status === 'SUSPENDED'
+            ? 'Votre compte est suspendu.'
+            : 'Votre compte est en cours de suppression.',
+          moderation: {
+            status: user.status,
+            reason: user.suspensionReason,
+            until: user.suspendedUntil,
+            scheduledDeletionAt: user.scheduledDeletionAt,
+            appealEndpoint: '/api/appeals',
+          },
+          data: { token: generateToken({ userId: user.id, role: user.role }) },
+          errors: null,
+        });
+      }
+    }
+
     // Générer un token
     const token = generateToken({ userId: user.id, role: user.role });
 
