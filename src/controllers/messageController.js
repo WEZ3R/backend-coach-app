@@ -1,4 +1,5 @@
 import prisma from '../config/database.js';
+import { notifierConversation } from '../ws.js';
 import { sendSuccess, sendError } from '../utils/responseHandler.js';
 import { canAccessClient, canAccessConversation } from '../utils/authorization.js';
 
@@ -24,6 +25,10 @@ export const sendMessage = async (req, res) => {
         isSentByCoach,
       },
     });
+
+    // Diffusion temps reel, sans attendre : la reponse HTTP ne doit pas dependre du
+    // WebSocket. Si personne n'ecoute, le sondage du client rattrapera.
+    notifierConversation(coachId, clientId, { type: 'message', coachId, clientId });
 
     sendSuccess(res, message, 'Message sent successfully', 201);
   } catch (error) {
