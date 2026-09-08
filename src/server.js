@@ -5,6 +5,7 @@ import compression from 'compression';
 import { config } from './config/env.js';
 import prisma from './config/database.js';
 import { apiLimiter } from './middlewares/rateLimit.js';
+import { attacherWebSocket } from './ws.js';
 
 // Import des routes
 import authRoutes from './routes/auth.js';
@@ -131,7 +132,9 @@ app.use((err, req, res, next) => {
 // Démarrage du serveur
 const PORT = config.port;
 
-app.listen(PORT, '0.0.0.0', () => {
+// `app.listen` rend le serveur HTTP sous-jacent : c'est lui qu'écoute le WebSocket, sur
+// le même port. Aucun port supplémentaire à ouvrir côté Fly, et `force_https` donne wss://.
+const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
 ╔═══════════════════════════════════════╗
 ║   🏋️  Coaching App API Server        ║
@@ -145,6 +148,8 @@ app.listen(PORT, '0.0.0.0', () => {
 Press CTRL+C to stop
   `);
 });
+
+attacherWebSocket(httpServer);
 
 // Gestion propre de l'arrêt
 process.on('SIGINT', async () => {
